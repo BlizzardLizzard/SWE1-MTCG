@@ -1,5 +1,3 @@
-package Card;
-
 public class Spell extends Card {
     private String effectiveness;
 
