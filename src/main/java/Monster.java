@@ -3,7 +3,6 @@ public class Monster extends Card {
 
     public Monster() {
         System.out.println("Monster has been created");
-
     }
 
     public String getSpecies() {

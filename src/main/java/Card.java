@@ -1,7 +1,7 @@
 public abstract class Card {
-    private String name;
-    private int damage;
-    private String elementType;
+    public String name;
+    public int damage;
+    public String elementType;
 
     public String getName() {
         return name;
