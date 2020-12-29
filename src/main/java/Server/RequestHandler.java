@@ -79,12 +79,28 @@ public class RequestHandler {
                     pst.executeUpdate();
                     status = "201";
                     stringRequest = "A new entry has been created";
-                }else{
-                    status = "409";
-                    stringRequest = "User already exists";
                 }
             }
         }
+        if(requestContext.URI.equals("/sessions")){
+            PreparedStatement data = con.prepareStatement("SELECT * FROM users WHERE username = ?");
+            data.setString(1, username);
+            ResultSet resultSet = data.executeQuery();
+            if(resultSet.next()){
+                if(password.equals(resultSet.getString(2))){
+                    status = "200";
+                    stringRequest = "Successfully logged in";
+                    loggedIn = true;
+                }else {
+                    status = "401";
+                    stringRequest = "Wrong login info";
+                }
+            }else{
+                status = "400";
+                stringRequest = "Wrong structure";
+            }
+        }
+
                 contentLength = stringRequest.length();
                 PrintReply(out);
                 out.println(stringRequest);
