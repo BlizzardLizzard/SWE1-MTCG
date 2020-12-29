@@ -1,7 +1,15 @@
 package Server;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.*;
 import java.net.Socket;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Objects;
 import java.util.Scanner;
 
@@ -14,6 +22,8 @@ public class RequestHandler {
     public String stringRequest = "";
     public int contentLength = 0;
 
+    private boolean loggedIn = false;
+
     //filters the incoming requests to the right function needed
     public RequestHandler(String request, Socket socket, RequestContext requestContext) throws IOException {
         PrintWriter out = null;
@@ -22,26 +32,70 @@ public class RequestHandler {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        this.request = request;
-        switch (request) {
-            case "POST" -> PostRequest(requestContext, out);
-            case "GET" -> GetRequest(requestContext, out);
-            case "DELETE" -> DeleteRequest(requestContext, out);
-            case "PUT" -> PutRequest(requestContext, out);
-            default -> {
-                status = "400";
-                stringRequest = "Invalid request!";
-                contentLength = stringRequest.length();
-                PrintReply(out);
-                out.println(stringRequest);
-                out.flush();
+
+        try {
+            Class.forName("org.postgresql.Driver");
+            Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
+            this.request = request;
+            switch (request) {
+                case "POST" -> PostRequest(requestContext, out, con);
+                case "GET" -> GetRequest(requestContext, out);
+                case "DELETE" -> DeleteRequest(requestContext, out);
+                case "PUT" -> PutRequest(requestContext, out);
+                default -> {
+                    status = "400";
+                    stringRequest = "Invalid request!";
+                    contentLength = stringRequest.length();
+                    PrintReply(out);
+                    out.println(stringRequest);
+                    out.flush();
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            System.exit(0);
         }
     }
 
     //handles the POST requests
-    public void PostRequest(RequestContext requestContext, PrintWriter out) {
+    public void PostRequest(RequestContext requestContext, PrintWriter out, Connection con) {
         try {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jsonNode = mapper.readTree(requestContext.message);
+        String username = jsonNode.get("Username").asText();
+        String password = jsonNode.get("Password").asText();
+
+        if(requestContext.URI.equals("/users")) {
+            PreparedStatement count = con.prepareStatement("SELECT count(*) AS total FROM users WHERE username = ?");
+            count.setString(1, username);
+            ResultSet resultSet = count.executeQuery();
+            if (resultSet.next()) {
+                int rows = resultSet.getInt(1);
+                if (rows == 0) {
+                    PreparedStatement pst = con.prepareStatement("INSERT INTO users(username, password) VALUES(?,?) ");
+                    pst.setString(1, username);
+                    pst.setString(2, password);
+                    pst.executeUpdate();
+                    status = "201";
+                    stringRequest = "A new entry has been created";
+                }else{
+                    status = "409";
+                    stringRequest = "User already exists";
+                }
+            }
+        }
+                contentLength = stringRequest.length();
+                PrintReply(out);
+                out.println(stringRequest);
+                out.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println(e.getClass().getName()+": "+e.getMessage());
+            System.exit(0);
+        }
+
+        /*try {
             //looks at number of entries in a directory and saves the amount of entries as an int and creates a file with that int as name
             int lastFileNumber = 0;
             numberOfEntriesInDir = Objects.requireNonNull(new File("messages/").listFiles()).length;
@@ -78,7 +132,7 @@ public class RequestHandler {
             out.flush();
         } catch (IOException ioException) {
             ioException.printStackTrace();
-        }
+        }*/
     }
 
     //handles the GET requests

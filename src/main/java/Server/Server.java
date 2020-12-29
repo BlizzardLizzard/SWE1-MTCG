@@ -9,7 +9,6 @@ import java.net.Socket;
 public class Server {
 
     public static void main(String[] args) throws IOException {
-
         //starting the server here
         ServerSocket server = new ServerSocket(10001);
         System.out.println("Listening for connection on port 10001 ....");
