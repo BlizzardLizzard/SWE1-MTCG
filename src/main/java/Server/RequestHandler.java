@@ -1,7 +1,10 @@
 package Server;
 
+import MTCG.Card;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
@@ -10,12 +13,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.Objects;
+import java.util.List;
 import java.util.Scanner;
 
 public class RequestHandler {
     public String request;
-    public int numberOfEntriesInDir = 0;
     public String status = " ";
     public String httpVersion = "HTTP/1.1";
     public String contentType = "text/plain";
@@ -61,46 +63,117 @@ public class RequestHandler {
     //handles the POST requests
     public void PostRequest(RequestContext requestContext, PrintWriter out, Connection con) {
         try {
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode jsonNode = mapper.readTree(requestContext.message);
-        String username = jsonNode.get("Username").asText();
-        String password = jsonNode.get("Password").asText();
 
-        if(requestContext.URI.equals("/users")) {
-            PreparedStatement count = con.prepareStatement("SELECT count(*) AS total FROM users WHERE username = ?");
-            count.setString(1, username);
-            ResultSet resultSet = count.executeQuery();
-            if (resultSet.next()) {
-                int rows = resultSet.getInt(1);
-                if (rows == 0) {
-                    PreparedStatement pst = con.prepareStatement("INSERT INTO users(username, password) VALUES(?,?) ");
-                    pst.setString(1, username);
-                    pst.setString(2, password);
-                    pst.executeUpdate();
+        if(requestContext.URI.equals("/users") || requestContext.URI.equals("/sessions")) {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(requestContext.message);
+            String username = jsonNode.get("Username").asText();
+            String password = jsonNode.get("Password").asText();
+
+            if (requestContext.URI.equals("/users")) {
+                PreparedStatement count = con.prepareStatement("SELECT count(*) AS total FROM users WHERE username = ?");
+                count.setString(1, username);
+                ResultSet resultSet = count.executeQuery();
+                if (resultSet.next()) {
+                    int rows = resultSet.getInt(1);
+                    if (rows == 0) {
+                        PreparedStatement pst = con.prepareStatement("INSERT INTO users(username, password) VALUES(?,?) ");
+                        pst.setString(1, username);
+                        pst.setString(2, password);
+                        pst.executeUpdate();
+                        status = "201";
+                        stringRequest = "A new entry has been created";
+                    }
+                }
+            }
+            if (requestContext.URI.equals("/sessions")) {
+                PreparedStatement data = con.prepareStatement("SELECT * FROM users WHERE username = ?");
+                data.setString(1, username);
+                ResultSet resultSet = data.executeQuery();
+                if (resultSet.next()) {
+                    if (password.equals(resultSet.getString(2))) {
+                        status = "200";
+                        stringRequest = "Successfully logged in";
+                        loggedIn = true;
+                    } else {
+                        status = "401";
+                        stringRequest = "Wrong login info";
+                    }
+                } else {
+                    status = "400";
+                    stringRequest = "Wrong structure";
+                }
+            }
+        }
+        if(requestContext.URI.equals("/packages")){
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            List<Card> listCard = mapper.readValue(requestContext.message, new TypeReference<List<Card>>(){});
+
+            for(Card card : listCard){
+                PreparedStatement pst = con.prepareStatement("INSERT INTO pack(id, name, damage) VALUES(?,?,?) ");
+                pst.setString(1, card.getId());
+                pst.setString(2, card.getName());
+                pst.setFloat(3, card.getDamage());
+                pst.executeUpdate();
+            }
+            status = "201";
+            stringRequest = "A new pack has been created";
+        }
+        if(requestContext.URI.equals("/transactions/packages")) {
+            int index = 1;
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] user = tokenSplit[1].split("-");
+
+            int currentMoney = 0;
+            PreparedStatement packAvailable = con.prepareStatement("SELECT count(*)  FROM pack");
+            ResultSet pack = packAvailable.executeQuery();
+            if(pack.next()) {
+                int numberOfCards = pack.getInt(1);
+                PreparedStatement money = con.prepareStatement("SELECT money FROM users WHERE username = ?");
+                money.setString(1, user[0]);
+                ResultSet moneySet = money.executeQuery();
+                if (moneySet.next()) {
+                    currentMoney = moneySet.getInt(1);
+                }
+                if (currentMoney > 0 && numberOfCards > 4) {
+                    currentMoney -= 5;
+                    PreparedStatement updateMoney = con.prepareStatement("UPDATE users SET money = ? WHERE username = ?");
+                    updateMoney.setInt(1, currentMoney);
+                    updateMoney.setString(2, user[0]);
+                    updateMoney.executeUpdate();
+
+                    PreparedStatement number = con.prepareStatement("SELECT MIN(number) FROM pack");
+                    ResultSet resultNumber = number.executeQuery();
+                    if (resultNumber.next()) {
+                        index = resultNumber.getInt(1);
+                    }
+                    for (int i = 1; i <= 5; i++) {
+                        PreparedStatement data = con.prepareStatement("SELECT id, name, damage FROM pack WHERE number = ?");
+                        data.setInt(1, index);
+                        ResultSet resultSet = data.executeQuery();
+                        index++;
+                        if (resultSet.next()) {
+                            System.out.println("ID: " + resultSet.getString(1) + " Name: " + resultSet.getString(2) + " Damage: " + resultSet.getFloat(3));
+                            PreparedStatement insert = con.prepareStatement("INSERT INTO stack(id, name, damage, player) VALUES (?,?,?,?)");
+                            insert.setString(1, resultSet.getString(1));
+                            insert.setString(2, resultSet.getString(2));
+                            insert.setFloat(3, resultSet.getFloat(3));
+                            insert.setString(4, token);
+                            insert.executeUpdate();
+
+                            PreparedStatement delete = con.prepareStatement("DELETE FROM pack WHERE id = ?");
+                            delete.setString(1, resultSet.getString(1));
+                            delete.executeUpdate();
+                            resultSet.next();
+                        }
+                    }
                     status = "201";
-                    stringRequest = "A new entry has been created";
+                    stringRequest = "A pack has been bought";
                 }
             }
         }
-        if(requestContext.URI.equals("/sessions")){
-            PreparedStatement data = con.prepareStatement("SELECT * FROM users WHERE username = ?");
-            data.setString(1, username);
-            ResultSet resultSet = data.executeQuery();
-            if(resultSet.next()){
-                if(password.equals(resultSet.getString(2))){
-                    status = "200";
-                    stringRequest = "Successfully logged in";
-                    loggedIn = true;
-                }else {
-                    status = "401";
-                    stringRequest = "Wrong login info";
-                }
-            }else{
-                status = "400";
-                stringRequest = "Wrong structure";
-            }
-        }
-
                 contentLength = stringRequest.length();
                 PrintReply(out);
                 out.println(stringRequest);
@@ -153,7 +226,7 @@ public class RequestHandler {
 
     //handles the GET requests
     public void GetRequest(RequestContext requestContext, PrintWriter out) throws FileNotFoundException {
-        String path = requestContext.getURI();
+        /*String path = requestContext.getURI();
         String[] pathSplit = path.split("/");
         File getFile = new File("messages/");
         String[] pathNames = getFile.list();
@@ -202,7 +275,7 @@ public class RequestHandler {
             PrintReply(out);
             out.println(stringRequest);
         }
-        out.flush();
+        out.flush();*/
     }
 
     //handles the DELETE requests

@@ -1,3 +1,5 @@
+import MTCG.Card;
+
 public class Pack {
     private Card cards;
 
