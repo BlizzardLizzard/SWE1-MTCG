@@ -17,8 +17,8 @@ public class RequestContext {
          this.requestString = requestString;
          System.out.println(requestString);
          int numberOfURIParts = URI.split("/").length;
-         if((request.equals("POST") || request.equals("PUT")) && numberOfURIParts == 2)
-         {
+         //needs to be looked at because it blocks users/kienboec but shouldnt was numberOfURIParts == 2
+         if(request.equals("POST") || request.equals("PUT")) {
              messageHandler(requestString);
          }
      }

@@ -789,7 +789,7 @@ false Zulu
     <database id="2" parent="1" name="MTCG">
       <ObjectId>16394</ObjectId>
       <Owner>postgres</Owner>
-      <IntrospectionStateNumber>920</IntrospectionStateNumber>
+      <IntrospectionStateNumber>977</IntrospectionStateNumber>
       <Relations>sequence|table|16456|16423|4
 </Relations>
     </database>
@@ -867,7 +867,7 @@ UC/10
 </Acl>
       <StateNumber>287</StateNumber>
       <Owner>postgres</Owner>
-      <IntrospectionStateNumber>921</IntrospectionStateNumber>
+      <IntrospectionStateNumber>978</IntrospectionStateNumber>
       <Current>1</Current>
     </schema>
     <extension id="18" parent="2" name="plpgsql">
@@ -61780,7 +61780,7 @@ r/10
     <table id="5158" parent="17" name="users">
       <ObjectId>16415</ObjectId>
       <Owner>postgres</Owner>
-      <StateNumber>897</StateNumber>
+      <StateNumber>976</StateNumber>
     </table>
     <check id="5159" parent="46" name="cardinal_number_domain_check">
       <ObjectId>13172</ObjectId>
@@ -109881,7 +109881,57 @@ umserver</ColNames>
       <DefaultExpression>20</DefaultExpression>
       <TypeId>23</TypeId>
     </column>
-    <index id="16136" parent="5158" name="user_pkey">
+    <column id="16136" parent="5158" name="name">
+      <Position>5</Position>
+      <DataType>varchar|0s</DataType>
+      <StateNumber>957</StateNumber>
+      <TypeId>1043</TypeId>
+    </column>
+    <column id="16137" parent="5158" name="bio">
+      <Position>6</Position>
+      <DataType>varchar|0s</DataType>
+      <StateNumber>958</StateNumber>
+      <TypeId>1043</TypeId>
+    </column>
+    <column id="16138" parent="5158" name="image">
+      <Position>7</Position>
+      <DataType>varchar|0s</DataType>
+      <StateNumber>959</StateNumber>
+      <TypeId>1043</TypeId>
+    </column>
+    <column id="16139" parent="5158" name="elo">
+      <Position>8</Position>
+      <DataType>integer|0s</DataType>
+      <NotNull>1</NotNull>
+      <StateNumber>971</StateNumber>
+      <DefaultExpression>100</DefaultExpression>
+      <TypeId>23</TypeId>
+    </column>
+    <column id="16140" parent="5158" name="wins">
+      <Position>9</Position>
+      <DataType>integer|0s</DataType>
+      <NotNull>1</NotNull>
+      <StateNumber>974</StateNumber>
+      <DefaultExpression>0</DefaultExpression>
+      <TypeId>23</TypeId>
+    </column>
+    <column id="16141" parent="5158" name="draws">
+      <Position>10</Position>
+      <DataType>integer|0s</DataType>
+      <NotNull>1</NotNull>
+      <StateNumber>975</StateNumber>
+      <DefaultExpression>0</DefaultExpression>
+      <TypeId>23</TypeId>
+    </column>
+    <column id="16142" parent="5158" name="losses">
+      <Position>11</Position>
+      <DataType>integer|0s</DataType>
+      <NotNull>1</NotNull>
+      <StateNumber>976</StateNumber>
+      <DefaultExpression>0</DefaultExpression>
+      <TypeId>23</TypeId>
+    </column>
+    <index id="16143" parent="5158" name="user_pkey">
       <ObjectId>16421</ObjectId>
       <StateNumber>497</StateNumber>
       <ColNames>username</ColNames>
@@ -109892,7 +109942,7 @@ umserver</ColNames>
       <CollationNames>default</CollationNames>
       <ClassIds>3126</ClassIds>
     </index>
-    <key id="16137" parent="5158" name="user_pkey">
+    <key id="16144" parent="5158" name="user_pkey">
       <ObjectId>16422</ObjectId>
       <StateNumber>497</StateNumber>
       <ColNames>username</ColNames>

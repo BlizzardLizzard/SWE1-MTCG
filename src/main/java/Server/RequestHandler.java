@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.net.Socket;
 import java.sql.*;
@@ -60,13 +61,13 @@ public class RequestHandler {
     public void PostRequest(RequestContext requestContext, PrintWriter out, Connection con) {
         try {
 
-        if(requestContext.URI.startsWith("/users") || requestContext.URI.equals("/sessions")) {
+        if(requestContext.URI.equals("/users") || requestContext.URI.equals("/sessions")) {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(requestContext.message);
             String username = jsonNode.get("Username").asText();
             String password = jsonNode.get("Password").asText();
 
-            if (requestContext.URI.startsWith("/users")) {
+            if (requestContext.URI.equals("/users")) {
                 PreparedStatement count = con.prepareStatement("SELECT count(*) AS total FROM users WHERE username = ?");
                 count.setString(1, username);
                 ResultSet resultSet = count.executeQuery();
@@ -179,45 +180,6 @@ public class RequestHandler {
             System.err.println(e.getClass().getName()+": "+e.getMessage());
             System.exit(0);
         }
-
-        /*try {
-            //looks at number of entries in a directory and saves the amount of entries as an int and creates a file with that int as name
-            int lastFileNumber = 0;
-            numberOfEntriesInDir = Objects.requireNonNull(new File("messages/").listFiles()).length;
-            numberOfEntriesInDir += 1;
-            File postFile = new File("messages/" + numberOfEntriesInDir + ".txt");
-
-            //checks for the highest ID in the directory to prevent overwriting
-            File files = new File("messages/");
-            String[] filesInDir = files.list();
-            int currentNumberOfEntriesInDir = filesInDir.length;
-            if(currentNumberOfEntriesInDir > 0){
-                String[] lastFileName = filesInDir[currentNumberOfEntriesInDir-1].split("\\.");
-                lastFileNumber = Integer.parseInt(lastFileName[0]);
-            }
-            //checks if file exists and if not writes the content in the corresponding txt
-            if(!postFile.exists() && lastFileNumber < numberOfEntriesInDir){
-                FileWriter writer = new FileWriter(postFile);
-                writer.write(requestContext.getMessage());
-                writer.close();
-                status = "201";
-                stringRequest = "ID: " + numberOfEntriesInDir;
-            }else{
-                lastFileNumber++;
-                File newFile = new File("messages/" + lastFileNumber + ".txt");
-                FileWriter newFileWriter = new FileWriter(newFile);
-                newFileWriter.write(requestContext.getMessage());
-                newFileWriter.close();
-                status = "201";
-                stringRequest = "ID: " + lastFileNumber;
-            }
-            contentLength = stringRequest.length();
-            PrintReply(out);
-            out.println(stringRequest);
-            out.flush();
-        } catch (IOException ioException) {
-            ioException.printStackTrace();
-        }*/
     }
 
     //handles the GET requests
@@ -246,57 +208,52 @@ public class RequestHandler {
                 }
             }
         }
-
-        /*String path = requestContext.getURI();
-        String[] pathSplit = path.split("/");
-        File getFile = new File("messages/");
-        String[] pathNames = getFile.list();
-        int numberOfStrings = pathSplit.length;
-
-        //if the path that was given without a number parse through the directory and print names and messages from the files in the directory
-        if(numberOfStrings <= 2 && pathNames.length > 0){
-            status = "200";
-            //for every entry in the directory the name and message is read and printed
-            for(String pathname : pathNames){
-                File file = new File("messages/" + pathname);
-                Scanner reader = new Scanner(file);
-                String message = " ";
-                while(reader.hasNextLine()){
-                    message = reader.nextLine();
+        if(requestContext.URI.startsWith("/users/")){
+            String[] user = requestContext.URI.split("/");
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+            if(user[2].equals(tokenName[0])){
+                PreparedStatement userBio = con.prepareStatement("SELECT name, bio, image FROM users WHERE username = ?");
+                userBio.setString(1,user[2]);
+                ResultSet userInfo = userBio.executeQuery();
+                if(userInfo.next()){
+                    System.out.println("Name: " + userInfo.getString(1));
+                    System.out.println("Bio: " + userInfo.getString(2));
+                    System.out.println("Image: " + userInfo.getString(3));
                 }
-                stringRequest += "Entry: " + pathname + " Message: " + message + "\r\n";
-                reader.close();
             }
-            contentLength = stringRequest.length();
-            PrintReply(out);
-            out.println(stringRequest);
-        }else if(numberOfStrings > 2){
-            //if a number is given search the directory for said name and read from it if it exists
-            File getRequest = new File("messages/" + pathSplit[2] + ".txt");
-            if(getRequest.exists()){
-                status = "200";
-                Scanner reader = new Scanner(getRequest);
-                String message = " ";
-                while(reader.hasNextLine()){
-                    message = reader.nextLine();
-                }
-                reader.close();
-                stringRequest = "Message from ID " + pathSplit[2] + ": " + message;
-            }else{
-                status = "404";
-                stringRequest = "Message ID doesn't exist!";
-            }
-            contentLength = stringRequest.length();
-            PrintReply(out);
-            out.println(stringRequest);
-        }else{
-            status = "400";
-            stringRequest = "Folder is empty!";
-            contentLength = stringRequest.length();
-            PrintReply(out);
-            out.println(stringRequest);
         }
-        out.flush();*/
+        if(requestContext.URI.equals("/stats")){
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+            PreparedStatement stats = con.prepareStatement("SELECT elo, wins, losses, draws FROM users WHERE username = ?");
+            stats.setString(1,tokenName[0]);
+            ResultSet resultStats = stats.executeQuery();
+            if(resultStats.next()){
+                System.out.println("Elo: " + resultStats.getString(1));
+                System.out.println(resultStats.getInt(2) + "/" + resultStats.getInt(3) + "/" + resultStats.getInt(4));
+            }
+        }
+        if(requestContext.URI.equals("/score")){
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+            PreparedStatement userExists = con.prepareStatement("SELECT count(*) FROM users WHERE username = ?");
+            userExists.setString(1,tokenName[0]);
+            ResultSet playerExists = userExists.executeQuery();
+            if(playerExists.next()){
+                int rows = playerExists.getInt(1);
+                if(rows == 1){
+                    PreparedStatement score = con.prepareStatement("SELECT username, elo FROM users ORDER BY elo DESC");
+                    ResultSet scoreboard = score.executeQuery();
+                    while(scoreboard.next()){
+                        System.out.println("Username: " + scoreboard.getString(1) + " Elo: " + scoreboard.getInt(2));
+                    }
+                }
+            }
+        }
     }
 
     //handles the DELETE requests
@@ -327,75 +284,68 @@ public class RequestHandler {
 
     //handles the PUT requests
     public void PutRequest(RequestContext requestContext, PrintWriter out, Connection con) throws IOException, SQLException {
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode jsonNode = mapper.readTree(requestContext.message);
-        int numberOfCards = jsonNode.size();
+        if (requestContext.URI.equals("/deck")) {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(requestContext.message);
+            int numberOfCards = jsonNode.size();
 
-        if(numberOfCards == 4) {
+            if (numberOfCards == 4) {
 
-            for (int i = 0; i < 4; i++) {
-                PreparedStatement searchForDeck = con.prepareStatement("SELECT id FROM stack WHERE deck = true AND player = ?");
-                searchForDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
-                ResultSet cardID = searchForDeck.executeQuery();
-                String id = null;
-                if (cardID.next()) {
-                    id = cardID.getString(1);
-                }
-                PreparedStatement updateDeck = con.prepareStatement("UPDATE stack SET deck = ? WHERE id = ?");
-                updateDeck.setBoolean(1, false);
-                updateDeck.setString(2, id);
-                updateDeck.executeUpdate();
-            }
-
-            for (int i = 0; i < 4; i++) {
-                String id = jsonNode.get(i).toString();
-                //regex from https://stackoverflow.com/questions/2608665/how-can-i-trim-beginning-and-ending-double-quotes-from-a-string
-                id = id.replaceAll("^\"|\"$", "");
-                System.out.println(id);
-                PreparedStatement cardExists = con.prepareStatement("SELECT count(*) FROM stack WHERE id = ? AND player = ?");
-                cardExists.setString(1, id);
-                cardExists.setString(2, requestContext.authenticationToken(requestContext.requestString));
-                ResultSet cardCount = cardExists.executeQuery();
-                int cardCountInt = 0;
-                if (cardCount.next()) {
-                    cardCountInt = cardCount.getInt(1);
-                }
-                if (cardCountInt == 1) {
+                for (int i = 0; i < 4; i++) {
+                    PreparedStatement searchForDeck = con.prepareStatement("SELECT id FROM stack WHERE deck = true AND player = ?");
+                    searchForDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
+                    ResultSet cardID = searchForDeck.executeQuery();
+                    String id = null;
+                    if (cardID.next()) {
+                        id = cardID.getString(1);
+                    }
                     PreparedStatement updateDeck = con.prepareStatement("UPDATE stack SET deck = ? WHERE id = ?");
-                    updateDeck.setBoolean(1, true);
+                    updateDeck.setBoolean(1, false);
                     updateDeck.setString(2, id);
                     updateDeck.executeUpdate();
                 }
+
+                for (int i = 0; i < 4; i++) {
+                    String id = jsonNode.get(i).toString();
+                    //regex from https://stackoverflow.com/questions/2608665/how-can-i-trim-beginning-and-ending-double-quotes-from-a-string
+                    id = id.replaceAll("^\"|\"$", "");
+                    System.out.println(id);
+                    PreparedStatement cardExists = con.prepareStatement("SELECT count(*) FROM stack WHERE id = ? AND player = ?");
+                    cardExists.setString(1, id);
+                    cardExists.setString(2, requestContext.authenticationToken(requestContext.requestString));
+                    ResultSet cardCount = cardExists.executeQuery();
+                    int cardCountInt = 0;
+                    if (cardCount.next()) {
+                        cardCountInt = cardCount.getInt(1);
+                    }
+                    if (cardCountInt == 1) {
+                        PreparedStatement updateDeck = con.prepareStatement("UPDATE stack SET deck = ? WHERE id = ?");
+                        updateDeck.setBoolean(1, true);
+                        updateDeck.setString(2, id);
+                        updateDeck.executeUpdate();
+                    }
+                }
             }
         }
-
-
-
-        /*String path = requestContext.getURI();
-        String[] pathSplit = path.split("/");
-        int numberOfStrings = pathSplit.length;
-
-        if (numberOfStrings > 2) {
-            File file = new File("messages/" + pathSplit[2] + ".txt");
-            if (file.exists()) {
-                FileWriter writer = new FileWriter(file);
-                //overwrites the message that has been inside the wanted txt
-                writer.write(requestContext.getMessage());
-                writer.close();
-                status = "200";
-                stringRequest = "File " + pathSplit[2] + ".txt updated!";
-            } else {
-                status = "404";
-                stringRequest = "Please enter a valid ID!";
+        if(requestContext.URI.startsWith("/users/")){
+            ObjectMapper mapper = new ObjectMapper();
+            String[] user = requestContext.URI.split("/");
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+            if(user[2].equals(tokenName[0])){
+                JsonNode jsonNode = mapper.readTree(requestContext.message);
+                String name = jsonNode.get("Name").asText();
+                String bio = jsonNode.get("Bio").asText();
+                String image = jsonNode.get("Image").asText();
+                PreparedStatement updateUser = con.prepareStatement("UPDATE users SET name = ?, bio = ?, image= ? WHERE username = ?");
+                updateUser.setString(1, name);
+                updateUser.setString(2, bio);
+                updateUser.setString(3, image);
+                updateUser.setString(4,user[2]);
+                updateUser.executeUpdate();
             }
-        }else{
-            status = "400";
-            stringRequest = "Please enter an ID!";
         }
-        contentLength = stringRequest.length();
-        PrintReply(out);
-        out.println(stringRequest);
-        out.flush();*/
     }
 
     //responsible for printing the header of the reply
