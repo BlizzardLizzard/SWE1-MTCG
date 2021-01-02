@@ -789,7 +789,7 @@ false Zulu
     <database id="2" parent="1" name="MTCG">
       <ObjectId>16394</ObjectId>
       <Owner>postgres</Owner>
-      <IntrospectionStateNumber>904</IntrospectionStateNumber>
+      <IntrospectionStateNumber>920</IntrospectionStateNumber>
       <Relations>sequence|table|16456|16423|4
 </Relations>
     </database>
@@ -867,7 +867,7 @@ UC/10
 </Acl>
       <StateNumber>287</StateNumber>
       <Owner>postgres</Owner>
-      <IntrospectionStateNumber>905</IntrospectionStateNumber>
+      <IntrospectionStateNumber>921</IntrospectionStateNumber>
       <Current>1</Current>
     </schema>
     <extension id="18" parent="2" name="plpgsql">
@@ -109835,10 +109835,10 @@ umserver</ColNames>
       <StateNumber>637</StateNumber>
       <TypeId>1043</TypeId>
     </column>
-    <column id="16130" parent="5157" name="inDeck">
+    <column id="16130" parent="5157" name="deck">
       <Position>5</Position>
       <DataType>boolean|0s</DataType>
-      <StateNumber>900</StateNumber>
+      <StateNumber>919</StateNumber>
       <DefaultExpression>false</DefaultExpression>
       <TypeId>16</TypeId>
     </column>

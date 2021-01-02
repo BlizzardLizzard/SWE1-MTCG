@@ -9,12 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.sql.*;
 import java.util.List;
-import java.util.Scanner;
 
 public class RequestHandler {
     public String request;
@@ -41,9 +37,9 @@ public class RequestHandler {
             this.request = request;
             switch (request) {
                 case "POST" -> PostRequest(requestContext, out, con);
-                case "GET" -> GetRequest(requestContext, out);
+                case "GET" -> GetRequest(requestContext, out, con);
                 case "DELETE" -> DeleteRequest(requestContext, out);
-                case "PUT" -> PutRequest(requestContext, out);
+                case "PUT" -> PutRequest(requestContext, out, con);
                 default -> {
                     status = "400";
                     stringRequest = "Invalid request!";
@@ -64,13 +60,13 @@ public class RequestHandler {
     public void PostRequest(RequestContext requestContext, PrintWriter out, Connection con) {
         try {
 
-        if(requestContext.URI.equals("/users") || requestContext.URI.equals("/sessions")) {
+        if(requestContext.URI.startsWith("/users") || requestContext.URI.equals("/sessions")) {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(requestContext.message);
             String username = jsonNode.get("Username").asText();
             String password = jsonNode.get("Password").asText();
 
-            if (requestContext.URI.equals("/users")) {
+            if (requestContext.URI.startsWith("/users")) {
                 PreparedStatement count = con.prepareStatement("SELECT count(*) AS total FROM users WHERE username = ?");
                 count.setString(1, username);
                 ResultSet resultSet = count.executeQuery();
@@ -225,7 +221,32 @@ public class RequestHandler {
     }
 
     //handles the GET requests
-    public void GetRequest(RequestContext requestContext, PrintWriter out) throws FileNotFoundException {
+    public void GetRequest(RequestContext requestContext, PrintWriter out, Connection con) throws SQLException {
+
+        if(requestContext.URI.equals("/cards")){
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            if(token != null){
+                PreparedStatement cards = con.prepareStatement("SELECT id, name, damage FROM stack WHERE player = ?");
+                cards.setString(1, token);
+                ResultSet cardStack = cards.executeQuery();
+                while(cardStack.next()){
+                    System.out.println("ID: " + cardStack.getString(1) + " Name: " + cardStack.getString(2) + " Damage: " + cardStack.getFloat(3));
+                }
+            }
+        }
+        if(requestContext.URI.equals("/deck")){
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            if(token != null){
+                PreparedStatement cards = con.prepareStatement("SELECT id, name, damage FROM stack WHERE player = ? AND deck = true");
+                cards.setString(1, token);
+                ResultSet cardStack = cards.executeQuery();
+                System.out.println(token);
+                while(cardStack.next()){
+                    System.out.println("ID: " + cardStack.getString(1) + " Name: " + cardStack.getString(2) + " Damage: " + cardStack.getFloat(3));
+                }
+            }
+        }
+
         /*String path = requestContext.getURI();
         String[] pathSplit = path.split("/");
         File getFile = new File("messages/");
@@ -305,8 +326,52 @@ public class RequestHandler {
     }
 
     //handles the PUT requests
-    public void PutRequest(RequestContext requestContext, PrintWriter out) throws IOException {
-        String path = requestContext.getURI();
+    public void PutRequest(RequestContext requestContext, PrintWriter out, Connection con) throws IOException, SQLException {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jsonNode = mapper.readTree(requestContext.message);
+        int numberOfCards = jsonNode.size();
+
+        if(numberOfCards == 4) {
+
+            for (int i = 0; i < 4; i++) {
+                PreparedStatement searchForDeck = con.prepareStatement("SELECT id FROM stack WHERE deck = true AND player = ?");
+                searchForDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
+                ResultSet cardID = searchForDeck.executeQuery();
+                String id = null;
+                if (cardID.next()) {
+                    id = cardID.getString(1);
+                }
+                PreparedStatement updateDeck = con.prepareStatement("UPDATE stack SET deck = ? WHERE id = ?");
+                updateDeck.setBoolean(1, false);
+                updateDeck.setString(2, id);
+                updateDeck.executeUpdate();
+            }
+
+            for (int i = 0; i < 4; i++) {
+                String id = jsonNode.get(i).toString();
+                //regex from https://stackoverflow.com/questions/2608665/how-can-i-trim-beginning-and-ending-double-quotes-from-a-string
+                id = id.replaceAll("^\"|\"$", "");
+                System.out.println(id);
+                PreparedStatement cardExists = con.prepareStatement("SELECT count(*) FROM stack WHERE id = ? AND player = ?");
+                cardExists.setString(1, id);
+                cardExists.setString(2, requestContext.authenticationToken(requestContext.requestString));
+                ResultSet cardCount = cardExists.executeQuery();
+                int cardCountInt = 0;
+                if (cardCount.next()) {
+                    cardCountInt = cardCount.getInt(1);
+                }
+                if (cardCountInt == 1) {
+                    PreparedStatement updateDeck = con.prepareStatement("UPDATE stack SET deck = ? WHERE id = ?");
+                    updateDeck.setBoolean(1, true);
+                    updateDeck.setString(2, id);
+                    updateDeck.executeUpdate();
+                }
+            }
+        }
+
+
+
+        /*String path = requestContext.getURI();
         String[] pathSplit = path.split("/");
         int numberOfStrings = pathSplit.length;
 
@@ -330,7 +395,7 @@ public class RequestHandler {
         contentLength = stringRequest.length();
         PrintReply(out);
         out.println(stringRequest);
-        out.flush();
+        out.flush();*/
     }
 
     //responsible for printing the header of the reply

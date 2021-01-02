@@ -47,14 +47,16 @@ public class RequestContext {
         message = lines[i+1];
     }
 
-    public String authenticationToken(String requestString){
+    public String authenticationToken(String requestString) {
         String[] lines = requestString.split("\\r?\\n");
         int i = 0;
-        while(!(lines[i].startsWith("Authorization:"))){
-            i++;
+        if (requestString.contains("Authorization:")) {
+            while (!(lines[i].startsWith("Authorization:"))) {
+                i++;
+            }
+            String realToken[] = lines[i].split(": ");
+            return realToken[1];
         }
-        String realToken[] = lines[i].split(": ");
-        return realToken[1];
+        return null;
     }
-
 }
