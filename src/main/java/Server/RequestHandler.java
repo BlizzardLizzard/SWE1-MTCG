@@ -39,7 +39,7 @@ public class RequestHandler {
             switch (request) {
                 case "POST" -> PostRequest(requestContext, out, con);
                 case "GET" -> GetRequest(requestContext, out, con);
-                case "DELETE" -> DeleteRequest(requestContext, out);
+                case "DELETE" -> DeleteRequest(requestContext, out, con);
                 case "PUT" -> PutRequest(requestContext, out, con);
                 default -> {
                     status = "400";
@@ -171,6 +171,59 @@ public class RequestHandler {
                 }
             }
         }
+        if(requestContext.URI.equals("/tradings")){
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(requestContext.message);
+            String tradeId = jsonNode.get("Id").asText();
+            String cardId = jsonNode.get("CardToTrade").asText();
+            String type = jsonNode.get("Type").asText();
+            int minimumDamage = jsonNode.get("MinimumDamage").asInt();
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            //funktion um zu schauen ob user auch existiert! und ob karte überhaupt existiert
+            PreparedStatement insertShop = con.prepareStatement("INSERT INTO shop(tradeid, cardid, token, typ, damage) VALUES (?,?,?,?,?)");
+            insertShop.setString(1, tradeId);
+            insertShop.setString(2, cardId);
+            insertShop.setString(3, token);
+            insertShop.setString(4, type);
+            insertShop.setInt(5, minimumDamage);
+            insertShop.executeUpdate();
+        }
+            if(requestContext.URI.startsWith("/tradings/")){
+                String[] tradeID = requestContext.URI.split("/");
+                String token = requestContext.authenticationToken(requestContext.requestString);
+                PreparedStatement getTokenFromTrade = con.prepareStatement("SELECT token, cardid FROM shop WHERE tradeid = ?");
+                getTokenFromTrade.setString(1,tradeID[2]);
+                ResultSet dbToken = getTokenFromTrade.executeQuery();
+                String dataBaseToken;
+                String tradeCardId;
+                if(dbToken.next()) {
+                    dataBaseToken = dbToken.getString(1);
+                    tradeCardId = dbToken.getString(2);
+                    System.out.println(dataBaseToken);
+                    System.out.println(tradeCardId);
+                    System.out.println(token);
+
+                    if (!token.equals(dataBaseToken)) {
+                        //es fehlt noch der vergleich und der check ob der min damage erreicht ist
+                        PreparedStatement tradeCard = con.prepareStatement("UPDATE shop SET traded = true WHERE tradeid = ?");
+                        tradeCard.setString(1,tradeID[2]);
+                        tradeCard.executeUpdate();
+
+                        String cardId = requestContext.message.replaceAll("^\"|\"$", "");
+                        System.out.println(cardId);
+
+                        PreparedStatement idSwap1 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
+                        idSwap1.setString(1,token);
+                        idSwap1.setString(2, tradeCardId);
+                        idSwap1.executeUpdate();
+
+                        PreparedStatement idSwap2 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
+                        idSwap2.setString(1,dataBaseToken);
+                        idSwap2.setString(2, cardId);
+                        idSwap2.executeUpdate();
+                    }
+                }
+            }
                 contentLength = stringRequest.length();
                 PrintReply(out);
                 out.println(stringRequest);
@@ -228,11 +281,12 @@ public class RequestHandler {
             String token = requestContext.authenticationToken(requestContext.requestString);
             String[] tokenSplit = token.split(" ");
             String[] tokenName = tokenSplit[1].split("-");
-            PreparedStatement stats = con.prepareStatement("SELECT elo, wins, losses, draws FROM users WHERE username = ?");
+            PreparedStatement stats = con.prepareStatement("SELECT elo, wins, losses, draws, gamesplayed FROM users WHERE username = ?");
             stats.setString(1,tokenName[0]);
             ResultSet resultStats = stats.executeQuery();
             if(resultStats.next()){
                 System.out.println("Elo: " + resultStats.getString(1));
+                System.out.println("Number of games played: " + resultStats.getInt(5));
                 System.out.println(resultStats.getInt(2) + "/" + resultStats.getInt(3) + "/" + resultStats.getInt(4));
             }
         }
@@ -254,11 +308,38 @@ public class RequestHandler {
                 }
             }
         }
+        if(requestContext.URI.equals("/tradings")){
+            String token = requestContext.authenticationToken(requestContext.requestString);
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+            PreparedStatement userExists = con.prepareStatement("SELECT count(*) FROM users WHERE username = ?");
+            userExists.setString(1,tokenName[0]);
+            ResultSet playerExists = userExists.executeQuery();
+            if(playerExists.next()){
+                int rows = playerExists.getInt(1);
+                if(rows == 1){
+                    PreparedStatement score = con.prepareStatement("SELECT * FROM shop WHERE traded = false");
+                    ResultSet scoreboard = score.executeQuery();
+                    while(scoreboard.next()){
+                        System.out.println("Shop");
+                    }
+                }
+            }
+        }
     }
 
     //handles the DELETE requests
-    public void DeleteRequest(RequestContext requestContext, PrintWriter out){
-        String path = requestContext.getURI();
+    public void DeleteRequest(RequestContext requestContext, PrintWriter out, Connection con) throws SQLException {
+        if(requestContext.URI.startsWith("/tradings")){
+            String[] tradeId = requestContext.URI.split("/");
+            String token = requestContext.authenticationToken(requestContext.requestString);
+
+            PreparedStatement delete = con.prepareStatement("DELETE FROM shop WHERE token = ? AND tradeid = ?");
+            delete.setString(1, token);
+            delete.setString(2,tradeId[2]);
+            delete.executeUpdate();
+        }
+        /*String path = requestContext.getURI();
         String[] pathSplit = path.split("/");
         int numberOfStrings = pathSplit.length;
         //checks if an ID has been give to delete is existing with if(deleteFile.delete()) if so its deleted else the file did not exist
@@ -275,7 +356,7 @@ public class RequestHandler {
             }else{
                 status = "400";
                 stringRequest = "Please enter an ID!";
-            }
+            }*/
         contentLength = stringRequest.length();
         PrintReply(out);
         out.println(stringRequest);
