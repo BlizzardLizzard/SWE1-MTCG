@@ -7,11 +7,11 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.net.Socket;
 import java.sql.*;
 import java.util.List;
+import java.util.Locale;
 
 public class RequestHandler {
     public String request;
@@ -152,12 +152,35 @@ public class RequestHandler {
                         ResultSet resultSet = data.executeQuery();
                         index++;
                         if (resultSet.next()) {
+                            String type = null;
+                            String element = null;
+                            String card = resultSet.getString(2);
+                            //regex from https://stackoverflow.com/questions/7593969/regex-to-split-camelcase-or-titlecase-advanced
+                            String[] cardAtrributes = card.split("(?<!^)(?=[A-Z])");
+                            int attributeLength = cardAtrributes.length;
+                            if(attributeLength == 1){
+                                element = "normal";
+                                type = "monster";
+                            }
+                            if(attributeLength == 2){
+                                element = cardAtrributes[0].toLowerCase(Locale.ROOT);
+                                if(cardAtrributes[1].equals("Spell")){
+                                    type = "spell";
+                                    if(cardAtrributes[0].equals("Regular")){
+                                        element = "normal";
+                                    }
+                                }else{
+                                    type = "monster";
+                                }
+                            }
                             System.out.println("ID: " + resultSet.getString(1) + " Name: " + resultSet.getString(2) + " Damage: " + resultSet.getFloat(3));
-                            PreparedStatement insert = con.prepareStatement("INSERT INTO stack(id, name, damage, player) VALUES (?,?,?,?)");
+                            PreparedStatement insert = con.prepareStatement("INSERT INTO stack(id, name, damage, player, element, type) VALUES (?,?,?,?,?,?)");
                             insert.setString(1, resultSet.getString(1));
                             insert.setString(2, resultSet.getString(2));
                             insert.setFloat(3, resultSet.getFloat(3));
                             insert.setString(4, token);
+                            insert.setString(5, element);
+                            insert.setString(6, type);
                             insert.executeUpdate();
 
                             PreparedStatement delete = con.prepareStatement("DELETE FROM pack WHERE id = ?");
@@ -191,36 +214,47 @@ public class RequestHandler {
             if(requestContext.URI.startsWith("/tradings/")){
                 String[] tradeID = requestContext.URI.split("/");
                 String token = requestContext.authenticationToken(requestContext.requestString);
-                PreparedStatement getTokenFromTrade = con.prepareStatement("SELECT token, cardid FROM shop WHERE tradeid = ?");
+                PreparedStatement getTokenFromTrade = con.prepareStatement("SELECT token, cardid, typ, damage FROM shop WHERE tradeid = ?");
                 getTokenFromTrade.setString(1,tradeID[2]);
                 ResultSet dbToken = getTokenFromTrade.executeQuery();
                 String dataBaseToken;
                 String tradeCardId;
+                String type;
+                int minDamage;
                 if(dbToken.next()) {
                     dataBaseToken = dbToken.getString(1);
                     tradeCardId = dbToken.getString(2);
-                    System.out.println(dataBaseToken);
-                    System.out.println(tradeCardId);
-                    System.out.println(token);
+                    type = dbToken.getString(3);
+                    minDamage = dbToken.getInt(4);
 
                     if (!token.equals(dataBaseToken)) {
-                        //es fehlt noch der vergleich und der check ob der min damage erreicht ist
-                        PreparedStatement tradeCard = con.prepareStatement("UPDATE shop SET traded = true WHERE tradeid = ?");
-                        tradeCard.setString(1,tradeID[2]);
-                        tradeCard.executeUpdate();
-
                         String cardId = requestContext.message.replaceAll("^\"|\"$", "");
-                        System.out.println(cardId);
+                        float tradeDamage = 0;
+                        String tradeType = null;
+                        PreparedStatement checkRequirements = con.prepareStatement("SELECT type, damage FROM stack WHERE player = ? AND id = ?");
+                        checkRequirements.setString(1, token);
+                        checkRequirements.setString(2, cardId);
+                        ResultSet requirements = checkRequirements.executeQuery();
+                        if (requirements.next()) {
+                            tradeType = requirements.getString(1);
+                            tradeDamage = requirements.getFloat(2);
+                        }
+                        if (tradeType.equals(type) && tradeDamage >= minDamage) {
+                            PreparedStatement tradeCard = con.prepareStatement("UPDATE shop SET traded = true WHERE tradeid = ?");
+                            tradeCard.setString(1, tradeID[2]);
+                            tradeCard.executeUpdate();
 
-                        PreparedStatement idSwap1 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
-                        idSwap1.setString(1,token);
-                        idSwap1.setString(2, tradeCardId);
-                        idSwap1.executeUpdate();
 
-                        PreparedStatement idSwap2 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
-                        idSwap2.setString(1,dataBaseToken);
-                        idSwap2.setString(2, cardId);
-                        idSwap2.executeUpdate();
+                            PreparedStatement idSwap1 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
+                            idSwap1.setString(1, token);
+                            idSwap1.setString(2, tradeCardId);
+                            idSwap1.executeUpdate();
+
+                            PreparedStatement idSwap2 = con.prepareStatement("UPDATE stack SET player = ? WHERE id = ?");
+                            idSwap2.setString(1, dataBaseToken);
+                            idSwap2.setString(2, cardId);
+                            idSwap2.executeUpdate();
+                        }
                     }
                 }
             }
@@ -371,7 +405,6 @@ public class RequestHandler {
             int numberOfCards = jsonNode.size();
 
             if (numberOfCards == 4) {
-
                 for (int i = 0; i < 4; i++) {
                     PreparedStatement searchForDeck = con.prepareStatement("SELECT id FROM stack WHERE deck = true AND player = ?");
                     searchForDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));

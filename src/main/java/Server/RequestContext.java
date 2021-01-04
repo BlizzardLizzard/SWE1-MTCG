@@ -16,7 +16,6 @@ public class RequestContext {
          this.URI = URI;
          this.requestString = requestString;
          System.out.println(requestString);
-         int numberOfURIParts = URI.split("/").length;
          //needs to be looked at because it blocks users/kienboec but shouldnt was numberOfURIParts == 2
          if(request.equals("POST") || request.equals("PUT")) {
              messageHandler(requestString);
@@ -38,13 +37,15 @@ public class RequestContext {
         return URI;
     }
 
-    public void messageHandler(String requestString){
-         String[] lines = requestString.split("\\r?\\n");
-         int i = 0;
-         while(!(lines[i].length() == 0)){
+    public void messageHandler(String requestString) {
+        String[] lines = requestString.split("\\r?\\n");
+        int i = 0;
+        if (!URI.equals("/transactions/packages")) {
+            while (!(lines[i].length() == 0)) {
                 i++;
-         }
-        message = lines[i+1];
+            }
+            message = lines[i + 1];
+        }
     }
 
     public String authenticationToken(String requestString) {
@@ -54,7 +55,7 @@ public class RequestContext {
             while (!(lines[i].startsWith("Authorization:"))) {
                 i++;
             }
-            String realToken[] = lines[i].split(": ");
+            String[] realToken = lines[i].split(": ");
             return realToken[1];
         }
         return null;
