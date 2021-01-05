@@ -1,1 +1,1 @@
-# SWE1-MTCGWe want to create a Monster Tading MTCG.Card Game where 2 player fight against each other in a round-based manner.
+# SWE1-MTCGWe want to create a Monster Tading MTCG.JsonObjects.Card Game where 2 player fight against each other in a round-based manner.

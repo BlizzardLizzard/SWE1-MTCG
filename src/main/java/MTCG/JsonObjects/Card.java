@@ -1,4 +1,4 @@
-package MTCG;
+package MTCG.JsonObjects;
 
 public class Card {
     public String Id;

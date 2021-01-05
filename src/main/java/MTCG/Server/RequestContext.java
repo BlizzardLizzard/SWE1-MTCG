@@ -1,4 +1,4 @@
-package Server;
+package MTCG.Server;
 
 public class RequestContext {
 

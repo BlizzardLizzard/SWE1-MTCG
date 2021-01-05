@@ -1,4 +1,4 @@
-package Server;//git repo: https://github.com/BlizzardLizzard/REST-HTTP-based-Server/
+package MTCG.Server;//git repo: https://github.com/BlizzardLizzard/REST-HTTP-based-Server/
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,9 +15,9 @@ public class Server {
         StartServer(server);
     }
 
-    public  static void StartServer(ServerSocket server) throws IOException{
+    public  static void StartServer(ServerSocket server) {
         try {
-            while (true) {
+            while(true) {
                 Socket socket = server.accept();
                 InputStream inputStream = socket.getInputStream();
 
@@ -39,13 +39,13 @@ public class Server {
         }
     }
 
-    public static void RequestHandler(String[] requestSplit, Socket socket, String requestString) throws IOException {
+    public static void RequestHandler(String[] requestSplit, Socket socket, String requestString) {
         String request = requestSplit[0];
         if (!request.isEmpty()) {
             String[] httpVersion = requestSplit[2].split("\\r?\\n");
-            //sends context of the request to the Server.RequestContext class to save important variables of teh request
-            RequestContext requestContext =  new RequestContext(request, httpVersion[0], requestSplit[1], requestString);
-            new RequestHandler(request, socket, requestContext);
+            //sends context of the request to the MTCG.RequestContext class to save important variables of teh request
+            RequestContext requestContext =  new MTCG.Server.RequestContext(request, httpVersion[0], requestSplit[1], requestString);
+            new MTCG.Server.RequestHandler(socket, requestContext);
         }
     }
 }
