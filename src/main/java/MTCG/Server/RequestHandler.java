@@ -1,5 +1,6 @@
 package MTCG.Server;
 
+import MTCG.BattleHandler;
 import MTCG.CardHandler;
 import MTCG.ShopHandler;
 import MTCG.UserHandler;
@@ -16,6 +17,7 @@ public class RequestHandler {
                 case "users", "sessions", "stats", "score" -> new UserHandler(requestContext, socket);
                 case "packages", "transactions", "tradings" -> new ShopHandler(requestContext, socket);
                 case "cards", "deck", "deck?format=plain" -> new CardHandler(requestContext, socket);
+                case "battles" -> new BattleHandler(requestContext, socket);
                 default -> {
                     ReplyHandler replyHandler = new ReplyHandler(socket);
                     replyHandler.generalErrorReply();

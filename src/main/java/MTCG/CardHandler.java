@@ -101,11 +101,11 @@ public class CardHandler {
                 if(textformat == 1){
                     plainText.append("ID: ").append(cardStack.getString(1)).append(" Name: ").append(cardStack.getString(2)).append(" Damage: ").append(cardStack.getFloat(3)).append("\r\n");
                 }
-                    CardStack card = new CardStack(cardStack.getString(1), cardStack.getFloat(3), cardStack.getString(2));
-                    String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(card);
-                    message.append(json);
-                    if (!cardStack.isLast()) {
-                        message.append(",");
+                CardStack card = new CardStack(cardStack.getString(1), cardStack.getFloat(3), cardStack.getString(2));
+                String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(card);
+                message.append(json);
+                if (!cardStack.isLast()) {
+                    message.append(",");
                 }
             }
             message.append("]");
@@ -174,6 +174,5 @@ public class CardHandler {
         }
         specialCaseInt = 2;
         return false;
-        }
-
+    }
 }

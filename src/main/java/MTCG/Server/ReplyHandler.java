@@ -173,6 +173,12 @@ public class ReplyHandler {
         printReply();
     }
 
+    public void player1SignedUp(){
+        status = "200 OK";
+        body = "{\"Message\": \"You successfully logged in to battle\"}";
+        printReply();
+    }
+
     public void generalErrorReply(){
         status = "400 Bad Request";
         body = "{\"Message\": \"Something went wrong\"}";

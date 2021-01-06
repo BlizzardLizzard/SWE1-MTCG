@@ -16,7 +16,6 @@ public class RequestContext {
          this.URI = URI;
          this.requestString = requestString;
          System.out.println(requestString);
-         //needs to be looked at because it blocks users/kienboec but shouldnt was numberOfURIParts == 2
          if(request.equals("POST") || request.equals("PUT")) {
              messageHandler(requestString);
          }
@@ -39,12 +38,14 @@ public class RequestContext {
 
     public void messageHandler(String requestString) {
         String[] lines = requestString.split("\\r?\\n");
-        int i = 0;
-        if (!URI.equals("/transactions/packages")) {
+        if (!URI.equals("/battles")) {
+            int i = 0;
             while (!(lines[i].length() == 0)) {
                 i++;
             }
-            message = lines[i + 1];
+            if (!URI.equals("/transactions/packages")) {
+                message = lines[i + 1];
+            }
         }
     }
 
