@@ -7,15 +7,20 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.Socket;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 public class UserHandler {
     public String URI;
     public String request;
     public boolean requestHandeled;
+    public int specialCaseInt;
 
-    public UserHandler(RequestContext requestContext, Socket socket) throws JsonProcessingException, SQLException, ClassNotFoundException {
+    public UserHandler(RequestContext requestContext, Socket socket) throws JsonProcessingException, SQLException, ClassNotFoundException, FileNotFoundException {
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
         this.URI = requestContext.URI;
@@ -70,6 +75,16 @@ public class UserHandler {
             }else{
                 replyHandler.userWrongToken();
             }
+        }
+        if(URI.equals("/log")){
+           String message = getBattleLogs(requestContext);
+           if(message != null){
+               replyHandler.getLogs(message);
+           }else if(specialCaseInt == 1){
+               replyHandler.noLogEntries();
+           }else if(specialCaseInt == 2){
+                replyHandler.noToken();
+           }
         }
     }
 
@@ -198,4 +213,45 @@ public class UserHandler {
         requestHandeled = false;
         return null;
     }
+
+    public String getBattleLogs(RequestContext requestContext) throws FileNotFoundException {
+        String token = requestContext.authenticationToken(requestContext.requestString);
+        if (token != null) {
+            String[] tokenSplit = token.split(" ");
+            String[] tokenName = tokenSplit[1].split("-");
+
+            File getFiles = new File("battleLog/");
+            String[] pathNames = getFiles.list();
+            ArrayList<String> userLogs = new ArrayList<>();
+            StringBuilder logs = new StringBuilder();
+            int numberOfEntries;
+
+            assert pathNames != null;
+            for (String name : pathNames) {
+                if (name.contains(tokenName[0])) {
+                    userLogs.add(name);
+                }
+            }
+            numberOfEntries = userLogs.size();
+            if (numberOfEntries == 0) {
+                specialCaseInt = 1;
+                return null;
+            }
+            for (String log : userLogs) {
+                logs.append(log).append("\r\n");
+                File file = new File("battleLog/" + log);
+                Scanner scanner = new Scanner(file);
+                while (scanner.hasNextLine()) {
+                    logs.append(scanner.nextLine()).append("\r\n");
+                }
+                logs.append("\r\n");
+                scanner.close();
+            }
+            return logs.toString();
+        }else{
+            specialCaseInt = 2;
+            return null;
+        }
+    }
+
 }

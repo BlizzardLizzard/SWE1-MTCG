@@ -4,9 +4,13 @@ import MTCG.JsonObjects.BattleCards;
 import MTCG.Server.ReplyHandler;
 import MTCG.Server.RequestContext;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.Socket;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Random;
 
 public class BattleHandler {
@@ -19,7 +23,7 @@ public class BattleHandler {
     public float damagePlayer2;
     public String message;
 
-    public BattleHandler(RequestContext requestContext, Socket socket) throws ClassNotFoundException, SQLException {
+    public BattleHandler(RequestContext requestContext, Socket socket) throws ClassNotFoundException, SQLException, IOException {
         int numberOfPlayers = -1;
         ReplyHandler replyHandler = new ReplyHandler(socket);
         Class.forName("org.postgresql.Driver");
@@ -70,6 +74,7 @@ public class BattleHandler {
                 if (!player1Token.equals(player2Token)) {
                     startBattle(con);
                     replyHandler.getBattleLog(message);
+                    createBattleLog();
                 }else{
                     replyHandler.samePlayer();
                 }
@@ -454,5 +459,17 @@ public class BattleHandler {
         }
         PreparedStatement resetBattle = con.prepareStatement("UPDATE battle SET players = 0, player1 = NULL, player2 = NULL WHERE id = 1");
         resetBattle.executeUpdate();
+    }
+
+    public void createBattleLog() throws IOException {
+        int numberOfEntriesInDirectory = Objects.requireNonNull(new File("battleLog/").listFiles()).length;
+        numberOfEntriesInDirectory += 1;
+        File createLog = new File("battleLog/" + numberOfEntriesInDirectory + "-" + player1Name + " vs " + player2Name);
+
+        if(!createLog.exists()){
+            FileWriter writer = new FileWriter(createLog);
+            writer.write(message);
+            writer.close();
+        }
     }
 }

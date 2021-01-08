@@ -14,7 +14,7 @@ public class RequestHandler {
         try {
             String[] UriCase = requestContext.URI.split("/");
             switch (UriCase[1]) {
-                case "users", "sessions", "stats", "score" -> new UserHandler(requestContext, socket);
+                case "users", "sessions", "stats", "score", "log" -> new UserHandler(requestContext, socket);
                 case "packages", "transactions", "tradings" -> new ShopHandler(requestContext, socket);
                 case "cards", "deck", "deck?format=plain" -> new CardHandler(requestContext, socket);
                 case "battles" -> new BattleHandler(requestContext, socket);

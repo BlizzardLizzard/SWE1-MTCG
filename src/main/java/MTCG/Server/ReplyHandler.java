@@ -197,6 +197,26 @@ public class ReplyHandler {
         printReply();
     }
 
+    public void getLogs(String message){
+        status = "200 OK";
+        body = message;
+        contentType = "text/plain";
+        printReply();
+        contentType = "application/json";
+    }
+
+    public void noLogEntries(){
+        status = "200 OK";
+        body = "{\"Message\": \"You have no log entries\"}";
+        printReply();
+    }
+
+    public void noToken(){
+        status = "401 Unauthorized";
+        body = "{\"Message\": \"No token\"}";
+        printReply();
+    }
+
     public void generalErrorReply(){
         status = "400 Bad Request";
         body = "{\"Message\": \"Something went wrong\"}";
