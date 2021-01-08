@@ -1,4 +1,4 @@
-package MTCG.Server;//git repo: https://github.com/BlizzardLizzard/REST-HTTP-based-Server/
+package MTCG.Server;//git repo: https://github.com/BlizzardLizzard/SWE1-MTCG
 
 import java.io.IOException;
 import java.io.InputStream;

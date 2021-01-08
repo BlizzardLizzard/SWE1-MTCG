@@ -11,46 +11,76 @@ import java.util.Random;
 
 public class BattleHandler {
 
-    public String player1Token;
-    public String player2Token;
+    public String player1Token = "";
+    public String player2Token = "";
     public String player1Name;
     public String player2Name;
     public float damagePlayer1;
     public float damagePlayer2;
+    public String message;
 
     public BattleHandler(RequestContext requestContext, Socket socket) throws ClassNotFoundException, SQLException {
         int numberOfPlayers = -1;
         ReplyHandler replyHandler = new ReplyHandler(socket);
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
-        PreparedStatement players = con.prepareStatement("SELECT players FROM battle");
-        ResultSet number = players.executeQuery();
-        if(number.next()){
-            numberOfPlayers = number.getInt(1);
-        }
-        if(numberOfPlayers == 0){
-            PreparedStatement player1 = con.prepareStatement("UPDATE battle SET player1 = ?, players = 1 WHERE id = 1");
-            player1.setString(1,requestContext.authenticationToken(requestContext.requestString));
-            player1.executeUpdate();
-            replyHandler.player1SignedUp();
-        }
-        if(numberOfPlayers == 1){
-            PreparedStatement player2 = con.prepareStatement("UPDATE battle SET player2 = ? WHERE id = 1");
-            player2.setString(1,requestContext.authenticationToken(requestContext.requestString));
-            player2.executeUpdate();
-            player2Token = requestContext.authenticationToken(requestContext.requestString);
 
-            PreparedStatement player1 = con.prepareStatement("SELECT player1 FROM battle");
-            ResultSet player = player1.executeQuery();
-            if(player.next()){
-                player1Token = player.getString(1);
+        int cards = 0;
+        PreparedStatement cardsInDeck = con.prepareStatement("SELECT count(*) FROM stack WHERE deck = true AND player = ?");
+        cardsInDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
+        ResultSet numberOfCards = cardsInDeck.executeQuery();
+        if(numberOfCards.next()){
+            cards = numberOfCards.getInt(1);
+        }
+
+        PreparedStatement gameInDB = con.prepareStatement("SELECT count(*) FROM battle WHERE id = 1");
+        ResultSet numberDb = gameInDB.executeQuery();
+        int game = 0;
+        if(numberDb.next()){
+            game = numberDb.getInt(1);
+        }
+        if(game == 0){
+            PreparedStatement startBattle = con.prepareStatement("INSERT INTO battle (id, players, player1, player2) VALUES (1, 0, NULL, NULL)");
+            startBattle.executeUpdate();
+        }
+
+        if(cards == 4) {
+            PreparedStatement players = con.prepareStatement("SELECT players FROM battle");
+            ResultSet number = players.executeQuery();
+            if (number.next()) {
+                numberOfPlayers = number.getInt(1);
             }
+            if (numberOfPlayers == 0) {
+                PreparedStatement player1 = con.prepareStatement("UPDATE battle SET player1 = ?, players = 1 WHERE id = 1");
+                player1.setString(1, requestContext.authenticationToken(requestContext.requestString));
+                player1.executeUpdate();
+                replyHandler.player1SignedUp();
+            }
+            if (numberOfPlayers == 1) {
+                PreparedStatement player2 = con.prepareStatement("UPDATE battle SET player2 = ? WHERE id = 1");
+                player2.setString(1, requestContext.authenticationToken(requestContext.requestString));
+                player2.executeUpdate();
+                player2Token = requestContext.authenticationToken(requestContext.requestString);
 
-            startBattle(con);
+                PreparedStatement player1 = con.prepareStatement("SELECT player1 FROM battle");
+                ResultSet player = player1.executeQuery();
+                if (player.next()) {
+                    player1Token = player.getString(1);
+                }
+                if (!player1Token.equals(player2Token)) {
+                    startBattle(con);
+                    replyHandler.getBattleLog(message);
+                }else{
+                    replyHandler.samePlayer();
+                }
+            }
+        }else{
+            replyHandler.notEnoughCards();
         }
     }
 
     public void startBattle(Connection con) throws SQLException {
+        int result;
         //get name of player 1
         String[] tokenSplitPlayer1 = player1Token.split(" ");
         String[] tokenName1 = tokenSplitPlayer1[1].split("-");
@@ -79,11 +109,13 @@ public class BattleHandler {
         while (player2Cards.next()) {
             player2.add(new BattleCards(player2Cards.getString(1), player2Cards.getFloat(2), player2Cards.getString(3), player2Cards.getString(4)));
         }
-        battleLogic(player1, player2);
+        result = battleLogic(player1, player2);
+        setNewStats(result, player1Name, player2Name, con);
     }
 
-    public void battleLogic(ArrayList<BattleCards> player1, ArrayList<BattleCards> player2) {
-        int numberOfGames = 0;
+    public int battleLogic(ArrayList<BattleCards> player1, ArrayList<BattleCards> player2) {
+        int numberOfGames = 1;
+        StringBuilder battle = new StringBuilder();
         while (player1.size() != 0 && player2.size() != 0 && numberOfGames < 101) {
             boolean specialEvent = false;
 
@@ -109,14 +141,14 @@ public class BattleHandler {
                 //goblin vs dragon
                 if ((cardNamePlayer1.contains("Goblin") && cardNamePlayer2.contains("Dragon")) || (cardNamePlayer1.contains("Dragon") && cardNamePlayer2.contains("Goblin"))) {
                     if (cardNamePlayer1.contains("Dragon")) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The goblin is too afraid to attack");
-                        System.out.println("=> " + player1Name + " " + cardNamePlayer1 + " defeats " + player2Name + " " + cardNamePlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The goblin is too afraid to attack").append("\r\n");
+                        battle.append("=> ").append(player1Name).append(" ").append(cardNamePlayer1).append(" defeats ").append(player2Name).append(" ").append(cardNamePlayer2).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The goblin is too afraid to attack");
-                        System.out.println("=> " + player2Name + " " + cardNamePlayer2 + " defeats " + player1Name + " " + cardNamePlayer1);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The goblin is too afraid to attack").append("\r\n");
+                        battle.append("=> ").append(player2Name).append(" ").append(cardNamePlayer2).append(" defeats ").append(player1Name).append(" ").append(cardNamePlayer1).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     }
                     specialEvent = true;
@@ -125,14 +157,14 @@ public class BattleHandler {
                 //wizard vs ork
                 if ((cardNamePlayer1.contains("Wizard") && cardNamePlayer2.contains("Ork")) || (cardNamePlayer1.contains("Ork") && cardNamePlayer2.contains("Wizard"))) {
                     if (cardNamePlayer1.contains("Wizard")) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The wizard controls the ork");
-                        System.out.println("=> " + player1Name + " " + cardNamePlayer1 + " defeats " + player2Name + " " + cardNamePlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The wizard controls the ork").append("\r\n");
+                        battle.append("=> ").append(player1Name).append(" ").append(cardNamePlayer1).append(" defeats ").append(player2Name).append(" ").append(cardNamePlayer2).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The wizard controls the ork");
-                        System.out.println("=> " + player2Name + " " + cardNamePlayer2 + " defeats " + player1Name + " " + cardNamePlayer1);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The wizard controls the ork").append("\r\n");
+                        battle.append("=> ").append(player2Name).append(" ").append(cardNamePlayer2).append(" defeats ").append(player1Name).append(" ").append(cardNamePlayer1).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     }
                     specialEvent = true;
@@ -141,14 +173,14 @@ public class BattleHandler {
                 //fireElf vs dragon
                 if ((cardNamePlayer1.contains("Elf") && cardNamePlayer2.contains("Dragon")) || (cardNamePlayer1.contains("Dragon") && cardNamePlayer2.contains("Elf"))) {
                     if (cardNamePlayer1.contains("Elf")) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The elf evaded the attack");
-                        System.out.println("=> " + player1Name + " " + cardNamePlayer1 + " defeats " + player2Name + " " + cardNamePlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The elf evaded the attack").append("\r\n");
+                        battle.append("=> ").append(player1Name).append(" ").append(cardNamePlayer1).append(" defeats ").append(player2Name).append(" ").append(cardNamePlayer2).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The elf evaded the attack");
-                        System.out.println("=> " + player2Name + " " + cardNamePlayer2 + " defeats " + player1Name + " " + cardNamePlayer1);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The elf evaded the attack").append("\r\n");
+                        battle.append("=> ").append(player2Name).append(" ").append(cardNamePlayer2).append(" defeats ").append(player1Name).append(" ").append(cardNamePlayer1).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     }
                     specialEvent = true;
@@ -157,15 +189,15 @@ public class BattleHandler {
                 //monster vs monster damage comparison
                 if (!specialEvent) {
                     if (damagePlayer1 == damagePlayer2) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("=> Draw");
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("=> Draw").append("\r\n");
                     } else if (damagePlayer1 > damagePlayer2) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("=> " + player1Name + " " + cardNamePlayer1 + " defeats " + player2Name + " " + cardNamePlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("=> ").append(player1Name).append(" ").append(cardNamePlayer1).append(" defeats ").append(player2Name).append(" ").append(cardNamePlayer2).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     } else if (damagePlayer1 < damagePlayer2) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("=> " + player2Name + " " + cardNamePlayer2 + " defeats " + player1Name + " " + cardNamePlayer1);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("=> ").append(player2Name).append(" ").append(cardNamePlayer2).append(" defeats ").append(player1Name).append(" ").append(cardNamePlayer1).append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     }
                 }
@@ -173,9 +205,9 @@ public class BattleHandler {
 
             //spell vs spell
             if (typePlayer1.equals(typePlayer2) && typePlayer1.equals("spell")) {
-                printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
+                printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
                 effectiveness(elementPlayer1, elementPlayer2, player1, player2, cardPlayer1, cardPlayer2);
-                printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2);
+                printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2, battle);
             }
 
             //spell vs monster
@@ -183,14 +215,14 @@ public class BattleHandler {
                 //knight vs waterSpell
                 if ((cardNamePlayer1.equals("Knight") && cardNamePlayer2.equals("WaterSpell")) || (cardNamePlayer1.equals("WaterSpell") && cardNamePlayer2.equals("Knight"))) {
                     if (cardNamePlayer1.equals("Knight")) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The knight drowned");
-                        System.out.println("-> (" + player2Name + ") " + cardNamePlayer2 + " wins");
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The knight drowned").append("\r\n");
+                        battle.append("-> (").append(player2Name).append(") ").append(cardNamePlayer2).append(" wins").append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The knight drowned");
-                        System.out.println("-> (" + player1Name + ") " + cardNamePlayer1 + " wins");
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The knight drowned").append("\r\n");
+                        battle.append("-> (").append(player1Name).append(") ").append(cardNamePlayer1).append(" wins").append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     }
                     specialEvent = true;
@@ -199,14 +231,14 @@ public class BattleHandler {
                 //kraken vs spell
                 if ((cardNamePlayer1.equals("Kraken") && typePlayer2.equals("spell")) || (typePlayer1.equals("spell") && cardNamePlayer2.equals("Kraken"))) {
                     if (cardNamePlayer1.equals("Kraken")) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The kraken is immune to spells");
-                        System.out.println("-> (" + player1Name + ") " + cardNamePlayer1 + " wins");
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The kraken is immune to spells").append("\r\n");
+                        battle.append("-> (").append(player1Name).append(") ").append(cardNamePlayer1).append(" wins").append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        System.out.println("The kraken is immune to spells");
-                        System.out.println("-> (" + player2Name + ") " + cardNamePlayer2 + " wins");
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        battle.append("The kraken is immune to spells").append("\r\n");
+                        battle.append("-> (").append(player2Name).append(") ").append(cardNamePlayer2).append(" wins").append("\r\n");
                         adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
                     }
                     specialEvent = true;
@@ -215,43 +247,54 @@ public class BattleHandler {
                 //same element vs same element
                 if(!specialEvent) {
                     if (elementPlayer1.equals(elementPlayer2)) {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
-                        printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
+                        printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2, battle);
                     } else {
-                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2);
+                        printBattle(cardNamePlayer1, cardNamePlayer2, damagePlayer1, damagePlayer2, battle);
                         effectiveness(elementPlayer1, elementPlayer2, player1, player2, cardPlayer1, cardPlayer2);
-                        printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2);
+                        printSpellAndMixedResults(damagePlayer1, damagePlayer2, cardNamePlayer1, cardNamePlayer2, player1, player2, cardPlayer1, cardPlayer2, battle);
                     }
                 }
             }
-            System.out.println("Number of cards: " + player1.size());
-            System.out.println("Number of cards: " + player2.size());
-            System.out.println(numberOfGames);
+            battle.append("Number of cards Player 1: ").append(player1.size()).append("\r\n");
+            battle.append("Number of cards Player 2: ").append(player2.size()).append("\r\n");
+            battle.append("Number of round: ").append(numberOfGames).append("\r\n").append("\r\n");
+
             numberOfGames ++;
         }
         if(numberOfGames >= 100){
-            System.out.println("Draw");
-        }else{
-            System.out.println("One player has won");
+            battle.append("The game has been drawn");
+            message = battle.toString();
+            return 0;
+        }else {
+            if (player2.size() == 0) {
+                battle.append("Player 1 has won (").append(player1Name).append(")");
+                message = battle.toString();
+                return 1;
+            } else {
+                battle.append("Player 2 has won (").append(player2Name).append(")");
+                message = battle.toString();
+                return 2;
+            }
         }
     }
 
-    public void printBattle(String cardNamePlayer1, String cardNamePlayer2, float damagePlayer1, float damagePlayer2) {
-            System.out.println("Player 1 (" + player1Name + "): " + cardNamePlayer1 + " (" + damagePlayer1 + " Damage) vs Player 2 (" + player2Name + "): " + cardNamePlayer2 + " (" + damagePlayer2 + " Damage)");
+    public void printBattle(String cardNamePlayer1, String cardNamePlayer2, float damagePlayer1, float damagePlayer2, StringBuilder battle) {
+            battle.append("Player 1 (").append(player1Name).append("): ").append(cardNamePlayer1).append(" (").append(damagePlayer1).append(" Damage) vs Player 2 (").append(player2Name).append("): ").append(cardNamePlayer2).append(" (").append(damagePlayer2).append(" Damage)").append("\r\n");
     }
 
-    public void printSpellAndMixedResults(float damagePlayer1, float damagePlayer2, String cardNamePlayer1, String cardNamePlayer2, ArrayList<BattleCards> player1, ArrayList<BattleCards> player2, int cardPlayer1, int cardPlayer2){
+    public void printSpellAndMixedResults(float damagePlayer1, float damagePlayer2, String cardNamePlayer1, String cardNamePlayer2, ArrayList<BattleCards> player1, ArrayList<BattleCards> player2, int cardPlayer1, int cardPlayer2, StringBuilder battle){
         if(damagePlayer1 == damagePlayer2){
-            System.out.println("=> Damage: " + cardNamePlayer1 + ": " + damagePlayer1 + " vs " + cardNamePlayer2 + ": " +damagePlayer2);
-            System.out.println("-> Draw");
+            battle.append("=> Damage: ").append(cardNamePlayer1).append(": ").append(damagePlayer1).append(" vs ").append(cardNamePlayer2).append(": ").append(damagePlayer2).append("\r\n");
+            battle.append("-> Draw").append("\r\n");
         }
         if(damagePlayer1 > damagePlayer2){
-            System.out.println("=> Damage: " + cardNamePlayer1 + ": " + damagePlayer1 + " vs " + cardNamePlayer2 + ": " +damagePlayer2);
-            System.out.println("-> (" + player1Name + ") " + cardNamePlayer1 + " wins");
+            battle.append("=> Damage: ").append(cardNamePlayer1).append(": ").append(damagePlayer1).append(" vs ").append(cardNamePlayer2).append(": ").append(damagePlayer2).append("\r\n");
+            battle.append("-> (").append(player1Name).append(") ").append(cardNamePlayer1).append(" wins").append("\r\n");
             adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 1);
         }if(damagePlayer1 < damagePlayer2){
-            System.out.println("=> Damage: " + cardNamePlayer1 + ": " + damagePlayer1 + " vs " + cardNamePlayer2 + ": " +damagePlayer2);
-            System.out.println("-> (" + player2Name + ") " + cardNamePlayer2 + " wins");
+            battle.append("=> Damage: ").append(cardNamePlayer1).append(": ").append(damagePlayer1).append(" vs ").append(cardNamePlayer2).append(": ").append(damagePlayer2).append("\r\n");
+            battle.append("-> (").append(player2Name).append(") ").append(cardNamePlayer2).append(" wins").append("\r\n");
             adjustDeck(player1, player2, cardPlayer1, cardPlayer2, 2);
         }
     }
@@ -302,5 +345,114 @@ public class BattleHandler {
             player2.add(player1.get(cardPlayer1));
             player1.remove(cardPlayer1);
         }
+    }
+
+    public void setNewStats(int result, String player1Name, String player2Name, Connection con) throws SQLException {
+        int eloPlayer1 = 0;
+        int winsPlayer1 = 0;
+        int drawsPlayer1 = 0;
+        int lossesPlayer1 = 0;
+        int gamesPlayer1 = 0;
+
+        int eloPlayer2 = 0;
+        int winsPlayer2 = 0;
+        int drawsPlayer2 = 0;
+        int lossesPlayer2 = 0;
+        int gamesPlayer2 = 0;
+
+        //get data from player1
+        PreparedStatement player1 = con.prepareStatement("SELECT elo, wins, draws, losses, gamesplayed FROM users WHERE username = ?");
+        player1.setString(1, player1Name);
+        ResultSet statsUpdate1 = player1.executeQuery();
+        if(statsUpdate1.next()){
+            eloPlayer1 = statsUpdate1.getInt(1);
+            winsPlayer1 = statsUpdate1.getInt(2);
+            drawsPlayer1 = statsUpdate1.getInt(3);
+            lossesPlayer1 = statsUpdate1.getInt(4);
+            gamesPlayer1 = statsUpdate1.getInt(5);
+        }
+
+        //get data from player2
+        PreparedStatement player2 = con.prepareStatement("SELECT elo, wins, draws, losses, gamesplayed FROM users WHERE username = ?");
+        player2.setString(1, player2Name);
+        ResultSet statsUpdate2 = player2.executeQuery();
+        if(statsUpdate2.next()){
+            eloPlayer2 = statsUpdate2.getInt(1);
+            winsPlayer2 = statsUpdate2.getInt(2);
+            drawsPlayer2 = statsUpdate2.getInt(3);
+            lossesPlayer2 = statsUpdate2.getInt(4);
+            gamesPlayer2 = statsUpdate2.getInt(5);
+        }
+
+        gamesPlayer1 += 1;
+        gamesPlayer2 += 1;
+
+        //draw
+        if(result == 0){
+            drawsPlayer1 += 1;
+            drawsPlayer2 += 1;
+
+            //update player1
+            PreparedStatement drawPlayer1 = con.prepareStatement("UPDATE users SET draws = ?, gamesplayed = ? WHERE username = ?");
+            drawPlayer1.setInt(1, drawsPlayer1);
+            drawPlayer1.setInt(2, gamesPlayer1);
+            drawPlayer1.setString(3, player1Name);
+            drawPlayer1.executeUpdate();
+
+            //update player2
+            PreparedStatement drawPlayer2 = con.prepareStatement("UPDATE users SET draws = ?, gamesplayed = ? WHERE username = ?");
+            drawPlayer2.setInt(1, drawsPlayer2);
+            drawPlayer2.setInt(2, gamesPlayer2);
+            drawPlayer2.setString(3, player2Name);
+            drawPlayer2.executeUpdate();
+        }
+        //player1 won
+        if(result == 1){
+            eloPlayer1 += 3;
+            eloPlayer2 -= 5;
+            winsPlayer1 += 1;
+            lossesPlayer2 += 1;
+
+            //update player1
+            PreparedStatement winPlayer1 = con.prepareStatement("UPDATE users SET wins = ?, gamesplayed = ?, elo = ? WHERE username = ?");
+            winPlayer1.setInt(1, winsPlayer1);
+            winPlayer1.setInt(2, gamesPlayer1);
+            winPlayer1.setInt(3, eloPlayer1);
+            winPlayer1.setString(4, player1Name);
+            winPlayer1.executeUpdate();
+
+            //update player2
+            PreparedStatement losePlayer2 = con.prepareStatement("UPDATE users SET losses = ?, gamesplayed = ?, elo = ? WHERE username = ?");
+            losePlayer2.setInt(1, lossesPlayer2);
+            losePlayer2.setInt(2, gamesPlayer2);
+            losePlayer2.setInt(3, eloPlayer2);
+            losePlayer2.setString(4, player2Name);
+            losePlayer2.executeUpdate();
+        }
+        //player2 won
+        if(result == 2){
+            eloPlayer2 += 3;
+            eloPlayer1 -= 5;
+            winsPlayer2 += 1;
+            lossesPlayer1 += 1;
+
+            //update player1
+            PreparedStatement losePlayer1 = con.prepareStatement("UPDATE users SET losses = ?, gamesplayed = ?, elo = ? WHERE username = ?");
+            losePlayer1.setInt(1, lossesPlayer1);
+            losePlayer1.setInt(2, gamesPlayer1);
+            losePlayer1.setInt(3, eloPlayer1);
+            losePlayer1.setString(4, player1Name);
+            losePlayer1.executeUpdate();
+
+            //update player2
+            PreparedStatement winPlayer2 = con.prepareStatement("UPDATE users SET wins = ?, gamesplayed = ?, elo = ? WHERE username = ?");
+            winPlayer2.setInt(1, winsPlayer2);
+            winPlayer2.setInt(2, gamesPlayer2);
+            winPlayer2.setInt(3, eloPlayer2);
+            winPlayer2.setString(4, player2Name);
+            winPlayer2.executeUpdate();
+        }
+        PreparedStatement resetBattle = con.prepareStatement("UPDATE battle SET players = 0, player1 = NULL, player2 = NULL WHERE id = 1");
+        resetBattle.executeUpdate();
     }
 }

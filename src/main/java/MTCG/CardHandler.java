@@ -34,7 +34,7 @@ public class CardHandler {
                 if (request.equals("GET")) {
                     String message = getDeck(requestContext, con, 0);
                     if (requestHandeled) {
-                        replyHandler.getDeck(message);
+                        replyHandler.getDeck(message, false);
                     } else {
                         replyHandler.userWrongToken();
                     }
@@ -54,7 +54,7 @@ public class CardHandler {
             }else{
                 String message = getDeck(requestContext, con, 1);
                 if(requestHandeled){
-                    replyHandler.getDeck(message);
+                    replyHandler.getDeck(message, true);
                 }else{
                     replyHandler.userWrongToken();
                 }
@@ -87,7 +87,7 @@ public class CardHandler {
         return null;
     }
 
-    public String getDeck(RequestContext requestContext, Connection con, int textformat) throws SQLException, JsonProcessingException {
+    public String getDeck(RequestContext requestContext, Connection con, int textFormat) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         StringBuilder plainText = new StringBuilder();
         if(token != null){
@@ -98,7 +98,7 @@ public class CardHandler {
             ObjectMapper mapper = new ObjectMapper();
             message.append("[");
             while(cardStack.next()){
-                if(textformat == 1){
+                if(textFormat == 1){
                     plainText.append("ID: ").append(cardStack.getString(1)).append(" Name: ").append(cardStack.getString(2)).append(" Damage: ").append(cardStack.getFloat(3)).append("\r\n");
                 }
                 CardStack card = new CardStack(cardStack.getString(1), cardStack.getFloat(3), cardStack.getString(2));
@@ -110,7 +110,7 @@ public class CardHandler {
             }
             message.append("]");
             requestHandeled = true;
-            if(textformat == 1){
+            if(textFormat == 1){
                 return plainText.toString();
             }
             return message.toString();

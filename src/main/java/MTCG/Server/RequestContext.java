@@ -38,14 +38,12 @@ public class RequestContext {
 
     public void messageHandler(String requestString) {
         String[] lines = requestString.split("\\r?\\n");
-        if (!URI.equals("/battles")) {
+        if (!URI.equals("/battles") && !URI.equals("/transactions/packages")) {
             int i = 0;
             while (!(lines[i].length() == 0)) {
                 i++;
             }
-            if (!URI.equals("/transactions/packages")) {
                 message = lines[i + 1];
-            }
         }
     }
 

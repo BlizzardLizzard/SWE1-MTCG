@@ -149,10 +149,14 @@ public class ReplyHandler {
         printReply();
     }
 
-    public void getDeck(String message){
+    public void getDeck(String message, boolean plainText ){
         status = "200 OK";
         body = message;
+        if(plainText){
+            contentType = "text/plain";
+        }
         printReply();
+        contentType = "application/json";
     }
 
     public void deckCreated(){
@@ -176,6 +180,20 @@ public class ReplyHandler {
     public void player1SignedUp(){
         status = "200 OK";
         body = "{\"Message\": \"You successfully logged in to battle\"}";
+        printReply();
+    }
+
+    public void getBattleLog(String message){
+        status = "200 OK";
+        body = message;
+        contentType = "text/plain";
+        printReply();
+        contentType = "application/json";
+    }
+
+    public void samePlayer(){
+        status = "403 Forbidden";
+        body = "{\"Message\": \"You can not play against yourself\"}";
         printReply();
     }
 
