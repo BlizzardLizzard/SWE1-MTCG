@@ -88,6 +88,9 @@ public class UserHandler {
         }
     }
 
+    public UserHandler(){
+    }
+
     public boolean createUser(RequestContext requestContext, Connection con) throws JsonProcessingException, SQLException {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode jsonNode = mapper.readTree(requestContext.message);
@@ -172,9 +175,6 @@ public class UserHandler {
         stats.setString(1,tokenName[0]);
         ResultSet resultStats = stats.executeQuery();
         if(resultStats.next()){
-            System.out.println("Elo: " + resultStats.getString(1));
-            System.out.println("Number of games played: " + resultStats.getInt(5));
-            System.out.println(resultStats.getInt(2) + "/" + resultStats.getInt(3) + "/" + resultStats.getInt(4));
             requestHandeled = true;
             return resultStats;
         }

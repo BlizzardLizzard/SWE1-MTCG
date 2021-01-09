@@ -1,10 +1,10 @@
 package MTCG.JsonObjects;
 
 public class BattleCards {
-    String name;
-    float damage;
-    String element;
-    String type;
+    public String name;
+    public float damage;
+    public String element;
+    public String type;
 
     public BattleCards(String name, float damage, String element, String type) {
         this.name = name;

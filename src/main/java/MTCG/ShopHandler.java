@@ -81,6 +81,9 @@ public class ShopHandler {
         }
     }
 
+    public ShopHandler(){
+    }
+
     public boolean createPackage(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -153,7 +156,6 @@ public class ShopHandler {
                                     type = "monster";
                                 }
                             }
-                            System.out.println("ID: " + resultSet.getString(1) + " Name: " + resultSet.getString(2) + " Damage: " + resultSet.getFloat(3));
                             PreparedStatement insert = con.prepareStatement("INSERT INTO stack(id, name, damage, player, element, type) VALUES (?,?,?,?,?,?)");
                             insert.setString(1, resultSet.getString(1));
                             insert.setString(2, resultSet.getString(2));

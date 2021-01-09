@@ -15,7 +15,7 @@ public class Server {
         StartServer(server);
     }
 
-    public  static void StartServer(ServerSocket server) {
+    public static void StartServer(ServerSocket server) {
         try {
             while(true) {
                 Socket socket = server.accept();
@@ -44,8 +44,8 @@ public class Server {
         if (!request.isEmpty()) {
             String[] httpVersion = requestSplit[2].split("\\r?\\n");
             //sends context of the request to the MTCG.RequestContext class to save important variables of teh request
-            RequestContext requestContext =  new MTCG.Server.RequestContext(request, httpVersion[0], requestSplit[1], requestString);
-            new MTCG.Server.RequestHandler(socket, requestContext);
+            RequestContext requestContext =  new RequestContext(request, httpVersion[0], requestSplit[1], requestString);
+            new RequestHandler(socket, requestContext);
         }
     }
 }

@@ -11,7 +11,7 @@ public class ReplyHandler {
     public String status = null;
     public String contentType = "application/json";
     public String body = "";
-    Socket socket;
+    public Socket socket;
 
     public ReplyHandler(Socket socket){
         this.socket = socket;
@@ -61,7 +61,15 @@ public class ReplyHandler {
 
     public void getStats(ResultSet stats) throws SQLException {
         status = "200 OK";
-        body = "{\"Elo\": \"" + stats.getString(1)+ "\",\"NumberOfGamesPlayed\": \"" + stats.getInt(5) + "\", \"Wins\": \"" + stats.getInt(2) + "\", \"Losses\": \"" + stats.getInt(3) + "\", \"Draws\": \"" + stats.getInt(4) + "\"}";
+        float winPercent = 0;
+        float lossesPercent = 0;
+        float drawPercent = 0;
+        if(stats.getInt(5) != 0) {
+            winPercent = (100 * stats.getInt(2)) / stats.getInt(5);
+            lossesPercent = (100 * stats.getInt(3)) / stats.getInt(5);
+            drawPercent = (100 * stats.getInt(4)) / stats.getInt(5);
+        }
+        body = "{\"Elo\": \"" + stats.getString(1)+ "\",\"NumberOfGamesPlayed\": \"" + stats.getInt(5) + "\", \"Wins\": \"" + stats.getInt(2) + "\", \"Losses\": \"" + stats.getInt(3) + "\", \"Draws\": \"" + stats.getInt(4) + "\", \"Win%/Loss%/Draws%\": \"" + winPercent + "/" + lossesPercent + "/" + drawPercent + "}";
         printReply();
     }
 

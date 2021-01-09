@@ -62,6 +62,9 @@ public class CardHandler {
         }
     }
 
+    public CardHandler(){
+    }
+
     public String getCards(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         if(token != null){
