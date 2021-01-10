@@ -36,7 +36,7 @@ class ShopHandlerTest {
     }
 
     @Test
-    void tradeFailTestExistiertNicht() throws SQLException {
+    void tradeFailTestDoesNotExist() throws SQLException {
         RequestContext requestContextUser = new RequestContext("POST", "HTTP/1.1", "/tradings/1", """
                 POST /tradings/1 HTTP/1.1\r
                 Host: localhost:10001\r

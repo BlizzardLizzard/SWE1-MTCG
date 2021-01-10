@@ -370,7 +370,7 @@ public class BattleHandler {
         }
     }
 
-    //updates the stats of players after the battle has ended (-3 elo for a loss and +5 elo for a win)
+    //updates the stats of players after the battle has ended (-5 elo for a loss and +3 elo for a win)
     public void setNewStats(int result, String player1Name, String player2Name, Connection con) throws SQLException {
         int eloPlayer1 = 0;
         int winsPlayer1 = 0;
