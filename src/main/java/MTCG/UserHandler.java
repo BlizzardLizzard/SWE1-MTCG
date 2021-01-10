@@ -20,6 +20,7 @@ public class UserHandler {
     public boolean requestHandeled;
     public int specialCaseInt;
 
+    //takes care of all the incoming requests and directs them to the right response
     public UserHandler(RequestContext requestContext, Socket socket) throws JsonProcessingException, SQLException, ClassNotFoundException, FileNotFoundException {
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
@@ -81,8 +82,10 @@ public class UserHandler {
            if(message != null){
                replyHandler.getLogs(message);
            }else if(specialCaseInt == 1){
+               //user has no battles under his belt
                replyHandler.noLogEntries();
            }else if(specialCaseInt == 2){
+               //there was no token in the request
                 replyHandler.noToken();
            }
         }
@@ -91,6 +94,7 @@ public class UserHandler {
     public UserHandler(){
     }
 
+    //creates the user
     public boolean createUser(RequestContext requestContext, Connection con) throws JsonProcessingException, SQLException {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode jsonNode = mapper.readTree(requestContext.message);
@@ -101,6 +105,7 @@ public class UserHandler {
         ResultSet resultSet = count.executeQuery();
         if (resultSet.next()) {
             int rows = resultSet.getInt(1);
+            //checks if user already exists if not creates a new user
             if (rows == 0) {
                 PreparedStatement pst = con.prepareStatement("INSERT INTO users(username, password) VALUES(?,?) ");
                 pst.setString(1, username);
@@ -112,6 +117,7 @@ public class UserHandler {
         return false;
     }
 
+    //logs in the user
     public boolean loginUser(RequestContext requestContext, Connection con) throws JsonProcessingException, SQLException {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode jsonNode = mapper.readTree(requestContext.message);
@@ -121,17 +127,20 @@ public class UserHandler {
         data.setString(1, username);
         ResultSet resultSet = data.executeQuery();
         if (resultSet.next()) {
+            //if password in database and password from json string equal log player in
             return password.equals(resultSet.getString(2));
         } else {
             return false;
         }
     }
 
+    //get all data that the user has set in his profile
     public ResultSet getUserData(RequestContext requestContext, Connection con) throws SQLException {
         String[] user = requestContext.URI.split("/");
         String token = requestContext.authenticationToken(requestContext.requestString);
         String[] tokenSplit = token.split(" ");
         String[] tokenName = tokenSplit[1].split("-");
+        //checks if the name of the token and the name of the user are the same
         if(user[2].equals(tokenName[0])){
             PreparedStatement userBio = con.prepareStatement("SELECT name, bio, image FROM users WHERE username = ?");
             userBio.setString(1,user[2]);
@@ -145,12 +154,14 @@ public class UserHandler {
         return null;
     }
 
+    //put data that the users provides into his profile
     public boolean setUserData(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         String[] user = requestContext.URI.split("/");
         String token = requestContext.authenticationToken(requestContext.requestString);
         String[] tokenSplit = token.split(" ");
         String[] tokenName = tokenSplit[1].split("-");
+        //checks if the name of the token and the name of the user are the same and sets the provided data into their profile
         if(user[2].equals(tokenName[0])){
             JsonNode jsonNode = mapper.readTree(requestContext.message);
             String name = jsonNode.get("Name").asText();
@@ -167,6 +178,7 @@ public class UserHandler {
         return false;
     }
 
+    //replys with the stats of the player (elo, wins, losses, draws and gamesplayed)
     public ResultSet getStats(RequestContext requestContext, Connection con) throws SQLException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         String[] tokenSplit = token.split(" ");
@@ -182,6 +194,7 @@ public class UserHandler {
         return null;
     }
 
+    //shows the current scoreboard of all players which are registered
     public String getScore(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         String[] tokenSplit = token.split(" ");
@@ -191,6 +204,7 @@ public class UserHandler {
         ResultSet playerExists = userExists.executeQuery();
         if(playerExists.next()){
             int rows = playerExists.getInt(1);
+            //checks if player that sent the request exists
             if(rows == 1){
                 StringBuilder message = new StringBuilder();
                 PreparedStatement score = con.prepareStatement("SELECT username, elo FROM users ORDER BY elo DESC");
@@ -214,8 +228,10 @@ public class UserHandler {
         return null;
     }
 
+    //sends back all their previous battles that have been taken place
     public String getBattleLogs(RequestContext requestContext) throws FileNotFoundException {
         String token = requestContext.authenticationToken(requestContext.requestString);
+        //checks if a token has been sent in the request
         if (token != null) {
             String[] tokenSplit = token.split(" ");
             String[] tokenName = tokenSplit[1].split("-");

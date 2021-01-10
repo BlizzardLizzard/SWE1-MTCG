@@ -16,6 +16,7 @@ public class CardHandler {
     public boolean requestHandeled;
     public int specialCaseInt;
 
+    //takes care of all the incoming requests and directs them to the right response
     public CardHandler(RequestContext requestContext, Socket socket) throws SQLException, ClassNotFoundException, JsonProcessingException {
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
@@ -32,6 +33,7 @@ public class CardHandler {
         }if(URI.startsWith("/deck")) {
             if (URI.equals("/deck")) {
                 if (request.equals("GET")) {
+                    //3rd parameter 0 stands for a reply that should be in json format
                     String message = getDeck(requestContext, con, 0);
                     if (requestHandeled) {
                         replyHandler.getDeck(message, false);
@@ -44,14 +46,17 @@ public class CardHandler {
                     if (requestHandeled) {
                         replyHandler.deckCreated();
                     } else if (specialCaseInt == 1) {
+                        //player does not exists of token is wrong
                         replyHandler.cardTokenError();
                     } else if (specialCaseInt == 2) {
+                        //not enought cards
                         replyHandler.notEnoughCards();
                     } else {
                         replyHandler.generalErrorReply();
                     }
                 }
             }else{
+                //3rd paramteter 1 stands for a reply that should be in plain text format
                 String message = getDeck(requestContext, con, 1);
                 if(requestHandeled){
                     replyHandler.getDeck(message, true);
@@ -65,8 +70,10 @@ public class CardHandler {
     public CardHandler(){
     }
 
+    //shows all the cards that the player currently owns
     public String getCards(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
+        //checks if a token has been sent with the request
         if(token != null){
             StringBuilder message = new StringBuilder();
             PreparedStatement cards = con.prepareStatement("SELECT id, name, damage FROM stack WHERE player = ?");
@@ -74,6 +81,7 @@ public class CardHandler {
             ResultSet cardStack = cards.executeQuery();
             ObjectMapper mapper = new ObjectMapper();
             message.append("[");
+            //creates the json objects of all cards
             while(cardStack.next()){
                 CardStack card = new CardStack(cardStack.getString(1), cardStack.getFloat(3), cardStack.getString(2));
                 String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(card);
@@ -90,15 +98,18 @@ public class CardHandler {
         return null;
     }
 
+    //shows the deck of the player that is currently selected
     public String getDeck(RequestContext requestContext, Connection con, int textFormat) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         StringBuilder plainText = new StringBuilder();
+        //checks if a token has been sent with the request
         if(token != null){
             StringBuilder message = new StringBuilder();
             PreparedStatement cards = con.prepareStatement("SELECT id, name, damage FROM stack WHERE player = ? AND deck = true");
             cards.setString(1, token);
             ResultSet cardStack = cards.executeQuery();
             ObjectMapper mapper = new ObjectMapper();
+            //creates a plain text and json respone
             message.append("[");
             while(cardStack.next()){
                 if(textFormat == 1){
@@ -113,6 +124,7 @@ public class CardHandler {
             }
             message.append("]");
             requestHandeled = true;
+            //if plain text is requested return the plain text string else return the json string
             if(textFormat == 1){
                 return plainText.toString();
             }
@@ -127,6 +139,7 @@ public class CardHandler {
         JsonNode jsonNode = mapper.readTree(requestContext.message);
         int numberOfCards = jsonNode.size();
 
+        //checks if 4 cards have been sent to set in the deck
         if (numberOfCards == 4) {
             for (int i = 0; i < 4; i++) {
                 PreparedStatement checkCardToken = con.prepareStatement("SELECT count(*) AS number FROM stack WHERE id = ? AND player = ?");
@@ -135,6 +148,7 @@ public class CardHandler {
                 ResultSet cardHolder = checkCardToken.executeQuery();
                 if (cardHolder.next()) {
                     int number = cardHolder.getInt(1);
+                    //if player does not exists reply with false
                     if (number == 0) {
                         specialCaseInt = 1;
                         return false;
@@ -142,6 +156,7 @@ public class CardHandler {
                 }
             }
 
+            //take all cards that have been set in the deck and set them from deck=true to deck=false
             for (int i = 0; i < 4; i++) {
                 PreparedStatement searchForDeck = con.prepareStatement("SELECT id FROM stack WHERE deck = true AND player = ?");
                 searchForDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
@@ -155,6 +170,7 @@ public class CardHandler {
                 }
             }
 
+            //checks if the card belongs to the player and sets the card to deck=true
             for (int i = 0; i < 4; i++) {
                 String id = jsonNode.get(i).toString();
                 //regex from https://stackoverflow.com/questions/2608665/how-can-i-trim-beginning-and-ending-double-quotes-from-a-string

@@ -21,6 +21,7 @@ public class ShopHandler {
     public boolean requestHandeled;
     public int specialCaseInt;
 
+    //takes care of all the incoming requests and directs them to the right response
     public ShopHandler(RequestContext requestContext, Socket socket) throws SQLException, ClassNotFoundException, JsonProcessingException {
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
@@ -36,8 +37,10 @@ public class ShopHandler {
             if (requestHandeled) {
                 replyHandler.boughtPackage();
             } else if (specialCaseInt == 1) {
+                //user has no money
                 replyHandler.userNoMoney();
             } else if (specialCaseInt == 2) {
+                //there are no more cards available
                 replyHandler.noMoreCards();
             }else{
                 replyHandler.generalErrorReply();
@@ -53,6 +56,7 @@ public class ShopHandler {
                 if(requestHandeled) {
                     replyHandler.getTrades(message);
                 }else{
+                    //token was not correct
                     replyHandler.userWrongToken();
                 }
             }
@@ -63,12 +67,16 @@ public class ShopHandler {
                 if (requestHandeled) {
                     replyHandler.traded();
                 } else if (specialCaseInt == 1) {
+                    //card does not meet requirements
                     replyHandler.requirementsError();
                 } else if (specialCaseInt == 2) {
+                    //card does not exist
                     replyHandler.nonExistingCard();
                 } else if (specialCaseInt == 3) {
+                    //user tries to trade with himself
                     replyHandler.tradeWithYourself();
                 } else if (specialCaseInt == 4) {
+                    //trade does not exist
                     replyHandler.tradeNonExistent();
                 }else{
                     replyHandler.generalErrorReply();
@@ -84,6 +92,7 @@ public class ShopHandler {
     public ShopHandler(){
     }
 
+    //creates a package with the provided cards in the pack database
     public boolean createPackage(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -99,6 +108,7 @@ public class ShopHandler {
         return true;
     }
 
+    //player tries to buy a package
     public boolean buyPackage(RequestContext requestContext, Connection con) throws SQLException {
         int index = 1;
         String token = requestContext.authenticationToken(requestContext.requestString);
@@ -110,6 +120,7 @@ public class ShopHandler {
         ResultSet pack = packAvailable.executeQuery();
         if (pack.next()) {
             int numberOfCards = pack.getInt(1);
+            //checks if the pack database has a pack left
             if (numberOfCards != 0) {
                 PreparedStatement money = con.prepareStatement("SELECT money FROM users WHERE username = ?");
                 money.setString(1, user[0]);
@@ -117,7 +128,8 @@ public class ShopHandler {
                 if (moneySet.next()) {
                     currentMoney = moneySet.getInt(1);
                 }
-                if (currentMoney > 0 && numberOfCards > 4) {
+                //checks if the player has any money left to buy a pack or the number of cards in pack is not 5
+                if (currentMoney > 0 && numberOfCards >= 4) {
                     currentMoney -= 5;
                     PreparedStatement updateMoney = con.prepareStatement("UPDATE users SET money = ? WHERE username = ?");
                     updateMoney.setInt(1, currentMoney);
@@ -184,6 +196,7 @@ public class ShopHandler {
         return false;
     }
 
+    //creates a trade for the player with the requirements that the player set
     public boolean createTrade(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode jsonNode = mapper.readTree(requestContext.message);
@@ -202,6 +215,7 @@ public class ShopHandler {
         return true;
     }
 
+    //player tries to trade
     public boolean trade(RequestContext requestContext, Connection con) throws SQLException {
         String[] tradeID = requestContext.URI.split("/");
         String token = requestContext.authenticationToken(requestContext.requestString);
@@ -217,7 +231,7 @@ public class ShopHandler {
             tradeCardId = dbToken.getString(2);
             type = dbToken.getString(3);
             minDamage = dbToken.getInt(4);
-
+            //checks if the player does not trade with himself
             if (!token.equals(dataBaseToken)) {
                 String cardId = requestContext.message.replaceAll("^\"|\"$", "");
                 float tradeDamage;
@@ -229,6 +243,7 @@ public class ShopHandler {
                 if (requirements.next()) {
                     tradeType = requirements.getString(1);
                     tradeDamage = requirements.getFloat(2);
+                    //checks if wanted card type and minimum damage requirements are met
                     if (tradeType.equals(type) && tradeDamage >= minDamage) {
                         PreparedStatement tradeCard = con.prepareStatement("UPDATE shop SET traded = true WHERE tradeid = ?");
                         tradeCard.setString(1, tradeID[2]);
@@ -246,23 +261,24 @@ public class ShopHandler {
                         idSwap2.executeUpdate();
                         return true;
                     }
-                    //karte besitzt nicht den richtigen typ oder damage
+                    //card doesnt have right type or damage
                     specialCaseInt = 1;
                     return false;
                 }
-                //karte die versucht wird zu traden existiert nicht
+                //card that tries to be traded doesnt exist
                 specialCaseInt = 2;
                 return false;
             }
-            //user versucht mit sich selbst zu traden
+            //user tries to trade with himself
             specialCaseInt = 3;
             return false;
         }
-        //trade existiert nicht
+        //trade does not exist
         specialCaseInt = 4;
         return false;
     }
 
+    //get all the trades that are existing
     public String getTrades(RequestContext requestContext, Connection con) throws SQLException, JsonProcessingException {
         String token = requestContext.authenticationToken(requestContext.requestString);
         String[] tokenSplit = token.split(" ");
@@ -272,6 +288,7 @@ public class ShopHandler {
         ResultSet playerExists = userExists.executeQuery();
         if(playerExists.next()){
             int rows = playerExists.getInt(1);
+            //checks if player exists
             if(rows == 1){
                 StringBuilder message = new StringBuilder();
                 PreparedStatement trade = con.prepareStatement("SELECT * FROM shop");
@@ -295,6 +312,7 @@ public class ShopHandler {
         return null;
     }
 
+    //deletes the trade of the trader
     public boolean deleteTrade(RequestContext requestContext, Connection con) throws SQLException {
         String[] tradeId = requestContext.URI.split("/");
         String token = requestContext.authenticationToken(requestContext.requestString);

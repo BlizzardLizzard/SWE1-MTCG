@@ -36,6 +36,7 @@ public class RequestContext {
         return URI;
     }
 
+    //saves the message of a request to use it later
     public void messageHandler(String requestString) {
         String[] lines = requestString.split("\\r?\\n");
         if (!URI.equals("/battles") && !URI.equals("/transactions/packages")) {
@@ -47,6 +48,7 @@ public class RequestContext {
         }
     }
 
+    //gets the token if it is in the request
     public String authenticationToken(String requestString) {
         String[] lines = requestString.split("\\r?\\n");
         int i = 0;

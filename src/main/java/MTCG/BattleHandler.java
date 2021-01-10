@@ -29,6 +29,7 @@ public class BattleHandler {
         Class.forName("org.postgresql.Driver");
         Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/MTCG", "postgres", "passwort");
 
+        //check number of cards of player
         int cards = 0;
         PreparedStatement cardsInDeck = con.prepareStatement("SELECT count(*) FROM stack WHERE deck = true AND player = ?");
         cardsInDeck.setString(1, requestContext.authenticationToken(requestContext.requestString));
@@ -37,6 +38,7 @@ public class BattleHandler {
             cards = numberOfCards.getInt(1);
         }
 
+        //create game if no game exists in the database
         PreparedStatement gameInDB = con.prepareStatement("SELECT count(*) FROM battle WHERE id = 1");
         ResultSet numberDb = gameInDB.executeQuery();
         int game = 0;
@@ -54,12 +56,16 @@ public class BattleHandler {
             if (number.next()) {
                 numberOfPlayers = number.getInt(1);
             }
+
+            //register first player if no one has registered to battle yet
             if (numberOfPlayers == 0) {
                 PreparedStatement player1 = con.prepareStatement("UPDATE battle SET player1 = ?, players = 1 WHERE id = 1");
                 player1.setString(1, requestContext.authenticationToken(requestContext.requestString));
                 player1.executeUpdate();
                 replyHandler.player1SignedUp();
             }
+
+            //register second player and start battle
             if (numberOfPlayers == 1) {
                 PreparedStatement player2 = con.prepareStatement("UPDATE battle SET player2 = ? WHERE id = 1");
                 player2.setString(1, requestContext.authenticationToken(requestContext.requestString));
@@ -76,10 +82,12 @@ public class BattleHandler {
                     replyHandler.getBattleLog(message);
                     createBattleLog();
                 }else{
+                    //the player tried to sign in 2 times
                     replyHandler.samePlayer();
                 }
             }
         }else{
+            //the players does not have 4 cards in his deck
             replyHandler.notEnoughCards();
         }
     }
@@ -114,6 +122,7 @@ public class BattleHandler {
         while (player2Cards.next()) {
             player2.add(new BattleCards(player2Cards.getString(1), player2Cards.getFloat(2), player2Cards.getString(3), player2Cards.getString(4)));
         }
+        //start battle
         result = battleLogic(player1, player2);
         setNewStats(result, player1Name, player2Name, con);
     }
@@ -121,9 +130,11 @@ public class BattleHandler {
     public int battleLogic(ArrayList<BattleCards> player1, ArrayList<BattleCards> player2) {
         int numberOfGames = 1;
         StringBuilder battle = new StringBuilder();
+        //checks if 100 games have been played or one of the players has no cards left
         while (player1.size() != 0 && player2.size() != 0 && numberOfGames < 101) {
             boolean specialEvent = false;
 
+            //random card chosen for player1 and player2
             Random rand1 = new Random();
             Random rand2 = new Random();
             int cardPlayer1 = rand1.nextInt(player1.size());
@@ -261,17 +272,20 @@ public class BattleHandler {
                     }
                 }
             }
+            //overview of current standings between the players
             battle.append("Number of cards Player 1: ").append(player1.size()).append("\r\n");
             battle.append("Number of cards Player 2: ").append(player2.size()).append("\r\n");
             battle.append("Number of round: ").append(numberOfGames).append("\r\n").append("\r\n");
 
             numberOfGames ++;
         }
+        //requirement for a draw
         if(numberOfGames >= 100){
             battle.append("The game has been drawn");
             message = battle.toString();
             return 0;
         }else {
+            //if player 2 has 0 cards in his deck player wins and the other way around
             if (player2.size() == 0) {
                 battle.append("Player 1 has won (").append(player1Name).append(")");
                 message = battle.toString();
@@ -284,10 +298,12 @@ public class BattleHandler {
         }
     }
 
+    //prints out the damage and name of the card and who it belongs to
     public void printBattle(String cardNamePlayer1, String cardNamePlayer2, float damagePlayer1, float damagePlayer2, StringBuilder battle) {
             battle.append("Player 1 (").append(player1Name).append("): ").append(cardNamePlayer1).append(" (").append(damagePlayer1).append(" Damage) vs Player 2 (").append(player2Name).append("): ").append(cardNamePlayer2).append(" (").append(damagePlayer2).append(" Damage)").append("\r\n");
     }
 
+    //if a spell and a monster or a spell and a spell fight against each other then the reply string is different to a monster vs monster fight
     public void printSpellAndMixedResults(float damagePlayer1, float damagePlayer2, String cardNamePlayer1, String cardNamePlayer2, ArrayList<BattleCards> player1, ArrayList<BattleCards> player2, int cardPlayer1, int cardPlayer2, StringBuilder battle){
         if(damagePlayer1 == damagePlayer2){
             battle.append("=> Damage: ").append(cardNamePlayer1).append(": ").append(damagePlayer1).append(" vs ").append(cardNamePlayer2).append(": ").append(damagePlayer2).append("\r\n");
@@ -304,6 +320,7 @@ public class BattleHandler {
         }
     }
 
+    //effectiveness of the mixed fights or spell fights is calculated by their element type water->fire, fire->normal, normal, water
     public void effectiveness(String elementPlayer1, String elementPlayer2, ArrayList<BattleCards> player1, ArrayList<BattleCards> player2, int cardPlayer1, int cardPlayer2){
         //fire vs water
         if ((elementPlayer1.equals("fire") && elementPlayer2.equals("water")) || (elementPlayer1.equals("water") && elementPlayer2.equals("fire"))) {
@@ -342,6 +359,7 @@ public class BattleHandler {
         }
     }
 
+    //removes a card from the player that lost and adds it to the winners deck
     public void adjustDeck(ArrayList<BattleCards> player1, ArrayList<BattleCards> player2, int cardPlayer1, int cardPlayer2, int player){
         if(player == 1){
             player1.add(player2.get(cardPlayer2));
@@ -352,6 +370,7 @@ public class BattleHandler {
         }
     }
 
+    //updates the stats of players after the battle has ended (-3 elo for a loss and +5 elo for a win)
     public void setNewStats(int result, String player1Name, String player2Name, Connection con) throws SQLException {
         int eloPlayer1 = 0;
         int winsPlayer1 = 0;
@@ -461,6 +480,7 @@ public class BattleHandler {
         resetBattle.executeUpdate();
     }
 
+    //saves the battle log into a folder for the possibility to later let each player look at their fought battles (unique feature)
     public void createBattleLog() throws IOException {
         int numberOfEntriesInDirectory = Objects.requireNonNull(new File("battleLog/").listFiles()).length;
         numberOfEntriesInDirectory += 1;

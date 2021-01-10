@@ -13,9 +13,11 @@ public class ReplyHandler {
     public String body = "";
     public Socket socket;
 
+    //takes care of all the possible replies that could happen
     public ReplyHandler(Socket socket){
         this.socket = socket;
     }
+
 
     public void userCreated(){
         status = "201 Created";
@@ -59,6 +61,7 @@ public class ReplyHandler {
         printReply();
     }
 
+    //optional feature shows stats but also win/loose/draw ratio
     public void getStats(ResultSet stats) throws SQLException {
         status = "200 OK";
         float winPercent = 0;
@@ -157,6 +160,7 @@ public class ReplyHandler {
         printReply();
     }
 
+    //switches type of response (json or plain text) depending on request
     public void getDeck(String message, boolean plainText ){
         status = "200 OK";
         body = message;
@@ -231,6 +235,7 @@ public class ReplyHandler {
         printReply();
     }
 
+    //prints the set reply
     public void printReply(){
         PrintWriter out = null;
         try {
